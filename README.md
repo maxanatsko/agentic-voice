@@ -44,8 +44,6 @@ Responsibilities are intentionally narrow:
 - `src/audio/audio-player.ts` — local playback only.
 - `src/config.ts` — environment configuration only.
 
-See `AGENTS.md` for the design constraints used in this repository.
-
 ## Requirements
 
 - Node.js 22+
@@ -149,7 +147,7 @@ Both tools use the same JSON hook schema, so `hooks/hooks.json` works for either
 
 ### Install as a plugin (recommended — nothing happens automatically until you run these)
 
-This repo is itself a valid plugin for both tools (`.claude-plugin/` + `.codex-plugin/` + `.agents/plugins/marketplace.json`), installable straight from a local clone, no publishing required. Validated end-to-end this session with the real CLI commands below (note the trailing slash — `claude plugin marketplace add .` without it is rejected as an invalid source format):
+This repo is itself a valid plugin for both tools (`.claude-plugin/` + `.codex-plugin/` + `.agents/plugins/marketplace.json`), installable straight from a local clone, no publishing required (note the trailing slash — `claude plugin marketplace add .` without it is rejected as an invalid source format):
 
 ```bash
 # Claude Code — installs at user scope (fires in every project)
@@ -179,9 +177,6 @@ POST {TTS_URL}/v1/audio/synthesize
 
 The request is multipart form data containing `language`, `text`, `voice`, and `speed`; the response is written as WAV audio and played locally.
 
-## Design principles
+## Contributing
 
-- **SoC:** protocol, TTS, playback, configuration, and orchestration live in separate modules.
-- **KISS:** one tool, one provider, one playback path.
-- **YAGNI:** no provider interfaces, DI container, queues, database, UI, or embedded summarizer until a real requirement exists.
-- **DRY:** MCP and CLI call the same `VoiceService`; synthesis and playback logic exist once.
+See [`AGENTS.md`](AGENTS.md) for the engineering principles and conventions this codebase follows.
