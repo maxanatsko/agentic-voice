@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "agentic-voice",
+  "description": "Local voice-notification hooks for agentic-voice.",
+  "owner": { "name": "Maxim Anatsko", "email": "max.anatsko.work@gmail.com" },
+  "plugins": [
+    {
+      "name": "agentic-voice",
+      "description": "Voice notifications when a turn ends or input is needed.",
+      "version": "0.1.0",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

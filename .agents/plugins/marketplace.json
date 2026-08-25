@@ -1,0 +1,11 @@
+{
+  "name": "agentic-voice",
+  "plugins": [
+    {
+      "name": "agentic-voice",
+      "source": { "source": "local", "path": "./" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Developer Tools"
+    }
+  ]
+}

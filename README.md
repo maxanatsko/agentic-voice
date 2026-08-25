@@ -145,14 +145,27 @@ Two events, two fixed phrase templates, one shared script (`hooks/speak-notify.s
 
 For example, running in this repo: "agentic-voice finished." / "agentic-voice needs your input."
 
-Both tools use the same JSON hook schema, so `hooks/hooks.json` works for either unchanged — each engine reads the keys it recognizes and ignores the rest.
+Both tools use the same JSON hook schema, so `hooks/hooks.json` works for either unchanged — each engine reads the keys it recognizes and ignores the rest. The `command` fields use `${CLAUDE_PLUGIN_ROOT}`, a variable both Claude Code's and Codex CLI's hook engines substitute at execution time when a hook is loaded via the plugin system below — no hardcoded path, portable to wherever the repo is cloned.
 
-**Install (nothing here happens automatically — copy/merge by hand):**
+### Install as a plugin (recommended — nothing happens automatically until you run these)
 
-- **Claude Code**: merge the `hooks` object from `hooks/hooks.json` into `~/.claude/settings.json` (global — fires in every project) or `<project>/.claude/settings.json` (that project only). This must be a deep-merge alongside any existing keys in that file, never a wholesale replace.
-- **Codex CLI**: copy the file into each project where you want it — `cp hooks/hooks.json /path/to/project/.codex/hooks.json` (Codex CLI hooks are per-project; there's no global equivalent).
+This repo is itself a valid plugin for both tools (`.claude-plugin/` + `.codex-plugin/` + `.agents/plugins/marketplace.json`), installable straight from a local clone, no publishing required. Validated end-to-end this session with the real CLI commands below (note the trailing slash — `claude plugin marketplace add .` without it is rejected as an invalid source format):
 
-Both files hardcode this repo's absolute path in the `command` field — adjust it if your clone lives elsewhere.
+```bash
+# Claude Code — installs at user scope (fires in every project)
+claude plugin marketplace add ./
+claude plugin install agentic-voice@agentic-voice -y
+
+# Codex CLI
+codex plugin marketplace add ./
+codex plugin add agentic-voice@agentic-voice
+```
+
+Check it loaded cleanly: `claude plugin details agentic-voice` / `codex plugin list --json`. To remove: `claude plugin uninstall agentic-voice && claude plugin marketplace remove agentic-voice`, `codex plugin remove agentic-voice@agentic-voice && codex plugin marketplace remove agentic-voice`.
+
+### Fallback: manual merge (no plugin install)
+
+Copy the `hooks` object out of `hooks/hooks.json` into `~/.claude/settings.json` (deep-merge alongside any existing keys, never a wholesale replace) or a project's `.codex/hooks.json`, replacing `${CLAUDE_PLUGIN_ROOT}` with this repo's absolute path — that variable is only substituted for plugin-loaded hooks.
 
 **Prerequisites**: `npm run build` (so `dist/src/cli.js` exists) and the bridge running (`npm run bridge:start`).
 

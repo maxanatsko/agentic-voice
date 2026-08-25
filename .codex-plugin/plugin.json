@@ -1,0 +1,6 @@
+{
+  "name": "agentic-voice",
+  "version": "0.1.0",
+  "description": "Voice notifications for coding agents: speaks when a turn ends or the agent needs your input.",
+  "hooks": "./hooks/hooks.json"
+}
