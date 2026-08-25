@@ -181,6 +181,10 @@ The request is multipart form data containing `language`, `text`, `voice`, and `
 
 See [`AGENTS.md`](AGENTS.md) for the engineering principles and conventions this codebase follows.
 
+## Author
+
+[Maxim Anatsko](https://maxanatsko.com)
+
 ## License
 
 [MIT](LICENSE)

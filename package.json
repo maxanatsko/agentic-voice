@@ -5,6 +5,7 @@
   "type": "module",
   "main": "opencode/plugin.mjs",
   "description": "Local voice output for coding agents, backed by a local TTS bridge",
+  "author": "Maxim Anatsko (https://maxanatsko.com)",
   "license": "MIT",
   "engines": {
     "node": ">=22"
