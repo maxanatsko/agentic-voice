@@ -1,0 +1,37 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/maxanatsko/GitHub/agentic-voice/hooks/speak-notify.sh \"Task finished.\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/maxanatsko/GitHub/agentic-voice/hooks/speak-notify.sh \"Needs your input.\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/maxanatsko/GitHub/agentic-voice/hooks/speak-notify.sh \"Needs your input.\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
