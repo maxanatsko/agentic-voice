@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository provides a minimal local voice-output capability for coding agents using NVIDIA Speech NIM.
+This repository provides a minimal local voice-output capability for coding agents, speaking through a local TTS backend over a fixed HTTP contract. The bundled backend (`bridge/`) wraps Kokoro-82M via FluidAudio; it is not an NVIDIA product.
 
 ## Engineering principles
 
@@ -13,9 +13,10 @@ Keep boundaries explicit:
 - MCP code handles MCP concerns only.
 - CLI code handles process input/output only.
 - `VoiceService` owns the speak use case and user-facing speech policy.
-- NVIDIA-specific HTTP details stay inside the NVIDIA TTS client.
+- TTS backend HTTP details stay inside the TTS client (`src/tts/tts-client.ts`).
 - Audio playback stays inside the audio module.
 - Configuration parsing stays in `config.ts`.
+- `bridge/` is a separate Swift package with its own toolchain; Node code must depend on it only through the documented HTTP contract, never by assuming its internals.
 
 Do not let transport-specific objects leak into application code.
 
@@ -29,13 +30,12 @@ Do not add capabilities without a concrete requirement. In particular, avoid add
 
 - provider abstraction layers before a second TTS provider exists;
 - persistence, queues, retries, telemetry, or a web UI;
-- an embedded summarization LLM;
-- speech-to-text or full-duplex audio;
-- host-specific hook integrations until their payload and lifecycle are known.
+- an embedded summarization LLM, including inside a hook — hooks (`hooks/`) stay fixed-phrase and deterministic, never transcript-parsing;
+- speech-to-text or full-duplex audio.
 
 ### DRY
 
-Share behavior, not coincidental syntax. MCP and CLI must use the same `VoiceService`. There should be one implementation each for NVIDIA synthesis, speech-length policy, configuration, and audio playback.
+Share behavior, not coincidental syntax. MCP and CLI must use the same `VoiceService`. There should be one implementation each for TTS synthesis, speech-length policy, configuration, and audio playback.
 
 Do not create generic helpers solely to remove two or three similar lines.
 
@@ -48,6 +48,7 @@ Do not create generic helpers solely to remove two or three similar lines.
 - Fail with actionable error messages; do not silently swallow synthesis or playback failures.
 - Never write diagnostic output to stdout from the MCP process. stdout is reserved for MCP protocol traffic; use stderr for diagnostics.
 - Tests should focus on deterministic application behavior. Do not mock implementation details merely to increase coverage.
+- Swift code in `bridge/` is not built or tested by the root `tsc`/`node --test` pipeline — verify it with `swift build --package-path bridge` (see `bridge/README.md`).
 
 ## Change checklist
 
