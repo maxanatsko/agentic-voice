@@ -132,22 +132,22 @@ technical output aloud. Keep the spoken message to one or two short sentences.
 
 ## Lifecycle hooks
 
-The `speak` MCP tool above already covers rich, context-aware notifications — the agent decides when to call it and summarizes for itself. The hooks in [`hooks/`](hooks/hooks.json) are a different, deterministic thing: a fixed-phrase backstop for the two moments an LLM isn't available to summarize anything — the turn just ended, or the tool is blocked waiting on you. They intentionally do **not** parse a transcript or try to be clever; that would duplicate what `speak` already does properly, and a shell hook has no LLM in the loop to summarize with.
+The `speak` MCP tool above already covers rich, context-aware notifications — the agent decides when to call it and summarizes for itself. The hooks below are a different, deterministic thing: a fixed-phrase backstop for the two moments an LLM isn't available to summarize anything — the turn just ended, or the tool is blocked waiting on you. They intentionally do **not** parse a transcript or try to be clever; that would duplicate what `speak` already does properly, and a shell hook has no LLM in the loop to summarize with.
 
 Two events, two fixed phrase templates, one shared script (`hooks/speak-notify.sh`). The script prefixes each phrase with the calling project's directory name (`basename "$PWD"`, the hook's own `cwd`) so overlapping sessions across projects are distinguishable — it's still fully deterministic, just reading a directory name, not summarizing anything:
 
 | Event | Phrase |
 | --- | --- |
-| Turn/task finished (Claude Code `Stop`, Codex CLI `Stop`) | `"<project> finished."` |
-| Waiting on you (Claude Code `Notification`, Codex CLI `PermissionRequest`) | `"<project> needs your input."` |
+| Turn/task finished (Claude Code `Stop`, Codex CLI `Stop`, opencode `session.idle`) | `"<project> finished."` |
+| Waiting on you (Claude Code `Notification`, Codex CLI `PermissionRequest`, opencode `permission.ask`) | `"<project> needs your input."` |
 
 For example, running in this repo: "agentic-voice finished." / "agentic-voice needs your input."
 
-Both tools use the same JSON hook schema, so `hooks/hooks.json` works for either unchanged — each engine reads the keys it recognizes and ignores the rest. The `command` fields use `${CLAUDE_PLUGIN_ROOT}`, a variable both Claude Code's and Codex CLI's hook engines substitute at execution time when a hook is loaded via the plugin system below — no hardcoded path, portable to wherever the repo is cloned.
+Claude Code and Codex CLI both consume the same declarative JSON hook schema, so [`hooks/hooks.json`](hooks/hooks.json) works for either unchanged — each engine reads the keys it recognizes and ignores the rest. Its `command` fields use `${CLAUDE_PLUGIN_ROOT}`, a variable both engines substitute at execution time when a hook is loaded via the plugin system below — no hardcoded path, portable to wherever the repo is cloned. opencode's plugin model is different — real JS event callbacks, not declarative config — so [`opencode/plugin.mjs`](opencode/plugin.mjs) maps the same two events to the same shared script directly.
 
 ### Install as a plugin (recommended — nothing happens automatically until you run these)
 
-This repo is itself a valid plugin for both tools (`.claude-plugin/` + `.codex-plugin/` + `.agents/plugins/marketplace.json`), installable straight from a local clone, no publishing required (note the trailing slash — `claude plugin marketplace add .` without it is rejected as an invalid source format):
+**Claude Code and Codex CLI** — this repo is itself a valid plugin for both (`.claude-plugin/` + `.codex-plugin/` + `.agents/plugins/marketplace.json`), installable straight from a local clone, no publishing required (note the trailing slash — `claude plugin marketplace add .` without it is rejected as an invalid source format):
 
 ```bash
 # Claude Code — installs at user scope (fires in every project)
@@ -161,7 +161,15 @@ codex plugin add agentic-voice@agentic-voice
 
 Check it loaded cleanly: `claude plugin details agentic-voice` / `codex plugin list --json`. To remove: `claude plugin uninstall agentic-voice && claude plugin marketplace remove agentic-voice`, `codex plugin remove agentic-voice@agentic-voice && codex plugin marketplace remove agentic-voice`.
 
-### Fallback: manual merge (no plugin install)
+**opencode** — `opencode plugin` installs directly from a GitHub `owner/repo` spec, no npm publish or local clone required:
+
+```bash
+opencode plugin maxanatsko/agentic-voice -g   # -g installs in global config (fires in every project)
+```
+
+To remove, delete the `"maxanatsko/agentic-voice"` entry opencode added to your plugin config (global config unless you omitted `-g`).
+
+### Fallback: manual merge (Claude Code / Codex CLI, no plugin install)
 
 Copy the `hooks` object out of `hooks/hooks.json` into `~/.claude/settings.json` (deep-merge alongside any existing keys, never a wholesale replace) or a project's `.codex/hooks.json`, replacing `${CLAUDE_PLUGIN_ROOT}` with this repo's absolute path — that variable is only substituted for plugin-loaded hooks.
 
