@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "opencode/plugin.mjs",
   "description": "Local voice output for coding agents, backed by a local TTS bridge",
   "engines": {
     "node": ">=22"
