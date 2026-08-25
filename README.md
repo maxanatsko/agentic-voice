@@ -180,3 +180,7 @@ The request is multipart form data containing `language`, `text`, `voice`, and `
 ## Contributing
 
 See [`AGENTS.md`](AGENTS.md) for the engineering principles and conventions this codebase follows.
+
+## License
+
+[MIT](LICENSE)
