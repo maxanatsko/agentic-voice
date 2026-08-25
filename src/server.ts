@@ -22,7 +22,7 @@ function buildServer(): McpServer {
     {
       title: 'Speak a short message',
       description:
-        'Speak a concise question, blocker, alert, or completion summary through local NVIDIA TTS. Do not send code, logs, paths, or long output.',
+        'Speak a concise question, blocker, alert, or completion summary through local TTS. Do not send code, logs, paths, or long output.',
       inputSchema: speakInput,
     },
     async ({ text }) => {

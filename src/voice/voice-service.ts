@@ -1,9 +1,9 @@
 import { AudioPlayer } from '../audio/audio-player.js';
-import { NvidiaTtsClient } from '../tts/nvidia-tts-client.js';
+import { TtsClient } from '../tts/tts-client.js';
 
 export class VoiceService {
   constructor(
-    private readonly tts: NvidiaTtsClient,
+    private readonly tts: TtsClient,
     private readonly player: AudioPlayer,
     private readonly maxChars: number,
   ) {}
