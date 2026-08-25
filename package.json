@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local NVIDIA-powered voice output for coding agents",
+  "description": "Local voice output for coding agents, backed by a local TTS bridge",
   "engines": {
     "node": ">=22"
   },
@@ -13,7 +13,10 @@
     "dev": "tsx src/server.ts",
     "speak": "tsx src/cli.ts",
     "test": "node --import tsx --test test/**/*.test.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "bridge:build": "swift build --package-path bridge",
+    "bridge:start": "swift run --package-path bridge TTSBridge",
+    "setup": "npm install && npm run build && npm run bridge:build"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

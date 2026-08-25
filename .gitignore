@@ -3,3 +3,5 @@ dist/
 .env
 *.wav
 .DS_Store
+bridge/.build/
+bridge/.swiftpm/
