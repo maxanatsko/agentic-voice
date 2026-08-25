@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/maxanatsko/GitHub/agentic-voice/hooks/speak-notify.sh \"Task finished.\"",
+            "command": "/Users/maxanatsko/GitHub/agentic-voice/hooks/speak-notify.sh finished",
             "timeout": 10
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/maxanatsko/GitHub/agentic-voice/hooks/speak-notify.sh \"Needs your input.\"",
+            "command": "/Users/maxanatsko/GitHub/agentic-voice/hooks/speak-notify.sh input",
             "timeout": 10
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/maxanatsko/GitHub/agentic-voice/hooks/speak-notify.sh \"Needs your input.\"",
+            "command": "/Users/maxanatsko/GitHub/agentic-voice/hooks/speak-notify.sh input",
             "timeout": 10
           }
         ]

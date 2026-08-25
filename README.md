@@ -136,12 +136,14 @@ technical output aloud. Keep the spoken message to one or two short sentences.
 
 The `speak` MCP tool above already covers rich, context-aware notifications — the agent decides when to call it and summarizes for itself. The hooks in [`hooks/`](hooks/hooks.json) are a different, deterministic thing: a fixed-phrase backstop for the two moments an LLM isn't available to summarize anything — the turn just ended, or the tool is blocked waiting on you. They intentionally do **not** parse a transcript or try to be clever; that would duplicate what `speak` already does properly, and a shell hook has no LLM in the loop to summarize with.
 
-Two events, two fixed phrases, one shared script (`hooks/speak-notify.sh`):
+Two events, two fixed phrase templates, one shared script (`hooks/speak-notify.sh`). The script prefixes each phrase with the calling project's directory name (`basename "$PWD"`, the hook's own `cwd`) so overlapping sessions across projects are distinguishable — it's still fully deterministic, just reading a directory name, not summarizing anything:
 
 | Event | Phrase |
 | --- | --- |
-| Turn/task finished (Claude Code `Stop`, Codex CLI `Stop`) | "Task finished." |
-| Waiting on you (Claude Code `Notification`, Codex CLI `PermissionRequest`) | "Needs your input." |
+| Turn/task finished (Claude Code `Stop`, Codex CLI `Stop`) | `"<project> finished."` |
+| Waiting on you (Claude Code `Notification`, Codex CLI `PermissionRequest`) | `"<project> needs your input."` |
+
+For example, running in this repo: "agentic-voice finished." / "agentic-voice needs your input."
 
 Both tools use the same JSON hook schema, so `hooks/hooks.json` works for either unchanged — each engine reads the keys it recognizes and ignores the rest.
 
