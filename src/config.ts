@@ -1,8 +1,19 @@
 import { existsSync } from 'node:fs';
 import process from 'node:process';
+import { join } from 'node:path';
+import { pluginRoot } from './runtime-paths.js';
 
-if (existsSync('.env')) {
-  process.loadEnvFile('.env');
+const envPath = join(pluginRoot, '.env');
+if (existsSync(envPath)) {
+  process.loadEnvFile(envPath);
+}
+
+export function isBundledTtsUrl(value: string): boolean {
+  const url = new URL(value);
+  return url.protocol === 'http:' &&
+    ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) &&
+    url.port === '9000' && url.pathname === '/' && !url.search && !url.hash &&
+    !url.username && !url.password;
 }
 
 export type AppConfig = {

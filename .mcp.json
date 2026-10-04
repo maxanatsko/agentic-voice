@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "agentic-voice": {
+      "command": "node",
+      "args": ["dist/src/server.js"],
+      "cwd": ".",
+      "tool_timeout_sec": 360
+    }
+  }
+}

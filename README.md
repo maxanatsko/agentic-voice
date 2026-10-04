@@ -37,17 +37,18 @@ The HTTP endpoint above is served locally by the bundled [`bridge/`](bridge/READ
 
 Responsibilities are intentionally narrow:
 
-- `src/server.ts` — MCP boundary only.
+- `src/server.ts` — MCP boundary and startup/shutdown wiring.
 - `src/cli.ts` — command-line boundary only.
 - `src/voice/voice-service.ts` — use-case orchestration and speech-length policy.
 - `src/tts/tts-client.ts` — TTS HTTP client only.
+- `src/tts/bridge-process.ts` — readiness and ownership of the separate bridge process.
 - `src/audio/audio-player.ts` — local playback only.
 - `src/config.ts` — environment configuration only.
 
 ## Requirements
 
 - Node.js 22+
-- A running TTS backend at an HTTP endpoint. The default assumes `http://127.0.0.1:9000`, served by the bundled `bridge/`.
+- A built bundled bridge, or an externally managed TTS backend. MCP automatically starts the bundled bridge at `http://127.0.0.1:9000` when needed.
 - To build/run the bundled bridge: Xcode 15+ / Swift 5.9+ (macOS, Apple Silicon).
 - A local WAV player: `afplay` on macOS or `aplay` on Linux, unless overridden.
 
@@ -58,6 +59,8 @@ The TTS backend can run on a separate machine reachable over HTTP — set `TTS_U
 ```bash
 cp .env.example .env
 ```
+
+Create `.env` in the plugin/repository root. MCP and CLI resolve it from their installed module location, independently of the calling project's working directory. Existing environment variables take precedence over `.env`.
 
 Environment variables:
 
@@ -77,16 +80,26 @@ npm run setup   # npm install + build the Node app + build the Swift bridge
 npm test
 ```
 
-Start the bridge (its own terminal/process — it's long-lived):
-
-```bash
-npm run bridge:start
-```
-
 Run the MCP server over stdio:
 
 ```bash
 npm start
+```
+
+MCP reuses a healthy bundled bridge or launches the already-built `bridge/.build/debug/TTSBridge` as a separate process. No separate terminal is needed. Startup never installs dependencies or compiles code. The bridge's first model initialization can download missing FluidAudio assets; later starts reuse its cache. MCP initialization and tool listing remain available during initialization, and `speak` waits for readiness (up to five minutes). Bridge output and actionable startup failures go to stderr; stdout contains only MCP protocol messages.
+
+Automatic bridge management applies only to HTTP loopback URLs (`127.0.0.1`, `localhost`, or `::1`) on port 9000 without a base path, query, credentials, or fragment. These aliases use the bundled bridge's IPv4 listener. Remote URLs and other custom endpoints are externally managed: MCP connects through the existing synthesis contract and never starts a local bridge for them.
+
+When MCP closes or receives SIGINT/SIGTERM, it stops only the child it started. Reused bridges survive that MCP instance's shutdown. With multiple instances, a borrowed bridge can disappear when its owner exits; restart the borrowing MCP instance if needed. There is no ownership transfer.
+
+MCP instances coordinate startup by exclusively binding `127.0.0.1:19000` before spawning the bridge. This reserved coordination port prevents concurrent model downloads/loading while port 9000 is still closed. The owner holds it until its child exits; other instances wait for readiness and reuse the bridge. The OS releases the coordination socket if its owner exits, with no persistent lock files. Keep port 19000 available; an unrelated listener there causes startup to time out with diagnostics.
+
+If the executable is missing, run `npm run setup` explicitly. If startup times out or model initialization fails, run `npm run bridge:start` to inspect diagnostics and finish first-use initialization, then restart MCP. If another service occupies port 9000, free the port or configure `TTS_URL` for your backend.
+
+The CLI and lifecycle hooks do not start the bridge. To try the CLI without an active MCP server, start a backend explicitly:
+
+```bash
+npm run bridge:start
 ```
 
 Try the CLI:
@@ -161,6 +174,17 @@ codex plugin add agentic-voice@agentic-voice
 
 Check it loaded cleanly: `claude plugin details agentic-voice` / `codex plugin list --json`. To remove: `claude plugin uninstall agentic-voice && claude plugin marketplace remove agentic-voice`, `codex plugin remove agentic-voice@agentic-voice && codex plugin marketplace remove agentic-voice`.
 
+The Codex plugin registers the stdio MCP server as well as hooks. After installation, run setup in the installed plugin copy if its build artifacts are missing, then reload Codex so it loads the new manifest and built files. Codex can omit the Swift `.build` directory when copying a local plugin, even if you already built the source checkout. The `speak` tool then becomes available and MCP manages the local bridge. Claude Code's plugin registration remains hooks-only.
+
+For an existing installation from this local marketplace, reinstall:
+
+```bash
+codex plugin remove agentic-voice@agentic-voice
+codex plugin add agentic-voice@agentic-voice --json
+```
+
+The JSON result includes `installedPath`. Run `npm run setup --prefix /absolute/installedPath` using that value to install dependencies and build both components in the installed copy. This is an explicit installation step, not MCP startup behavior. Repeat it after reinstalling if the build artifacts were omitted. Then reload Codex. Check startup stderr if the tool fails to load or speak.
+
 **opencode** — `opencode plugin` installs directly from a GitHub `owner/repo` spec, no npm publish or local clone required:
 
 ```bash
@@ -175,6 +199,8 @@ Copy the `hooks` object out of `hooks/hooks.json` into `~/.claude/settings.json`
 
 **Prerequisites**: `npm run build` (so `dist/src/cli.js` exists) and the bridge running (`npm run bridge:start`).
 
+An active MCP-owned bridge can also serve hooks. The hook script currently redirects output and suppresses errors with `|| true`, so hook failures are silent; MCP startup diagnostics remain visible on stderr.
+
 ## TTS HTTP contract
 
 The bridge (and any compatible backend) exposes this HTTP synthesis endpoint:
@@ -184,6 +210,8 @@ POST {TTS_URL}/v1/audio/synthesize
 ```
 
 The request is multipart form data containing `language`, `text`, `voice`, and `speed`; the response is written as WAV audio and played locally.
+
+For automatic management at the bundled loopback URL, backends must also expose `GET {TTS_URL}/v1/audio/health`: HTTP 200 with JSON `{"status":"ready"}` when synthesis is available, or HTTP 503 with JSON `{"status":"initializing"}` while loading. The bundled bridge starts HTTP only after model initialization and returns ready immediately. Readiness does not synthesize audio and does not depend on the response at `/`. Remote/custom URLs remain externally managed and only require the synthesis endpoint. Rebuild the bridge after updating its health endpoint.
 
 ## Contributing
 
