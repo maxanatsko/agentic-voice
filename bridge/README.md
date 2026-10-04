@@ -26,7 +26,7 @@ swift run --package-path bridge TTSBridge
 
 First run downloads the model from HuggingFace (roughly a minute) and caches it outside this repo at `~/.cache/fluidaudio/Models/` — that cache is FluidAudio's own convention, not something this repo controls.
 
-Later runs load cached assets; they do not reinstall or rebuild anything. HTTP starts only after `manager.initialize` completes, so the identifying `GET /` response indicates readiness without synthesizing audio. MCP waits up to five minutes; if first-use downloads take longer, complete initialization manually and restart MCP.
+Later runs load cached assets; they do not reinstall or rebuild anything. HTTP starts only after `manager.initialize` completes. The documented `GET /v1/audio/health` endpoint returns HTTP 200 and JSON `{"status":"ready"}` once synthesis is available; `/` is only a welcome page. MCP waits up to five minutes; if first-use downloads take longer, complete initialization manually and restart MCP. MCP startup coordination reserves `127.0.0.1:19000` to prevent multiple bridge children from initializing concurrently.
 
 The server listens on `127.0.0.1:9000` and preloads one voice at startup (`am_michael`, set in `Sources/TTSBridge/main.swift`).
 

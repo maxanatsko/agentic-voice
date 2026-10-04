@@ -21,6 +21,15 @@ struct SynthesizeRequest: Content {
     let speed: String?
 }
 
+struct HealthResponse: Content {
+    let status: String
+}
+
+// HTTP starts only after model initialization, so this endpoint is ready immediately.
+app.get("v1", "audio", "health") { req async -> HealthResponse in
+    HealthResponse(status: "ready")
+}
+
 app.on(.POST, "v1", "audio", "synthesize") { req async throws -> Response in
     let payload = try req.content.decode(SynthesizeRequest.self)
     let text = payload.text.trimmingCharacters(in: .whitespacesAndNewlines)

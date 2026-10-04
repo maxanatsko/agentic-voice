@@ -92,6 +92,8 @@ Automatic bridge management applies only to HTTP loopback URLs (`127.0.0.1`, `lo
 
 When MCP closes or receives SIGINT/SIGTERM, it stops only the child it started. Reused bridges survive that MCP instance's shutdown. With multiple instances, a borrowed bridge can disappear when its owner exits; restart the borrowing MCP instance if needed. There is no ownership transfer.
 
+MCP instances coordinate startup by exclusively binding `127.0.0.1:19000` before spawning the bridge. This reserved coordination port prevents concurrent model downloads/loading while port 9000 is still closed. The owner holds it until its child exits; other instances wait for readiness and reuse the bridge. The OS releases the coordination socket if its owner exits, with no persistent lock files. Keep port 19000 available; an unrelated listener there causes startup to time out with diagnostics.
+
 If the executable is missing, run `npm run setup` explicitly. If startup times out or model initialization fails, run `npm run bridge:start` to inspect diagnostics and finish first-use initialization, then restart MCP. If another service occupies port 9000, free the port or configure `TTS_URL` for your backend.
 
 The CLI and lifecycle hooks do not start the bridge. To try the CLI without an active MCP server, start a backend explicitly:
@@ -208,6 +210,8 @@ POST {TTS_URL}/v1/audio/synthesize
 ```
 
 The request is multipart form data containing `language`, `text`, `voice`, and `speed`; the response is written as WAV audio and played locally.
+
+For automatic management at the bundled loopback URL, backends must also expose `GET {TTS_URL}/v1/audio/health`: HTTP 200 with JSON `{"status":"ready"}` when synthesis is available, or HTTP 503 with JSON `{"status":"initializing"}` while loading. The bundled bridge starts HTTP only after model initialization and returns ready immediately. Readiness does not synthesize audio and does not depend on the response at `/`. Remote/custom URLs remain externally managed and only require the synthesis endpoint. Rebuild the bridge after updating its health endpoint.
 
 ## Contributing
 

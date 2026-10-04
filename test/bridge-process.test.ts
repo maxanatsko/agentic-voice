@@ -7,8 +7,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import { BridgeProcess } from '../src/tts/bridge-process.js';
 import { isBundledTtsUrl } from '../src/config.js';
+import { TtsClient } from '../src/tts/tts-client.js';
 
-const identity = 'TTSBridge (FluidAudio Kokoro-ANE) is running.\n';
+const healthBody = JSON.stringify({ status: 'ready' });
+const lockPorts = new Map<string, number>();
 
 async function listen(server: Server): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -26,20 +28,26 @@ async function fixture(url: string, mode = 'serve') {
   const directory = await mkdtemp(join(tmpdir(), 'voice-bridge-test-'));
   const executable = join(directory, 'bridge');
   const pidFile = join(directory, 'pid');
+  if (!lockPorts.has(url)) lockPorts.set(url, Number(new URL(await unusedUrl()).port));
   await writeFile(executable, `#!${process.execPath}
 const http = require('node:http');
 require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));
 ${mode === 'exit' ? 'process.exit(23);' : mode === 'hang' || mode === 'stubborn' ? `${mode === 'stubborn' ? "process.on('SIGTERM', () => {});" : ''}setInterval(() => {}, 1000);` : `
-const server = http.createServer((req, res) => res.end(${JSON.stringify(identity)}));
+const server = http.createServer((req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.end(req.url === '/v1/audio/health' ? ${JSON.stringify(healthBody)} : 'arbitrary welcome page');
+});
 server.on('error', () => process.exit(24));
-server.listen(${new URL(url).port}, '127.0.0.1');`}
+setTimeout(() => server.listen(${new URL(url).port}, '127.0.0.1'), ${mode === 'cold' ? 300 : 0});`}
 `, { mode: 0o755 });
   const bridge = new BridgeProcess(url, {
     executable, startupTimeoutMs: 2000, pollIntervalMs: 20, shutdownTimeoutMs: 100,
+    startupLockPort: lockPorts.get(url)!,
   });
   return {
     bridge,
     executable,
+    pidFile,
     pid: async () => {
       for (let attempt = 0; attempt < 100; attempt++) {
         const pid = await readFile(pidFile, 'utf8').catch(() => undefined);
@@ -70,15 +78,29 @@ test('only the bundled loopback endpoint is automatically managed', () => {
   }
 });
 
-test('reuses a healthy external bridge and leaves it running on shutdown', async () => {
-  const server = createServer((req, res) => res.end(identity));
+test('reuses a backend through documented health regardless of its welcome page', async () => {
+  const server = createServer((req, res) => res.end(req.url === '/v1/audio/health' ? healthBody : 'different backend'));
   const url = await listen(server);
   const bridge = new BridgeProcess(url, { executable: '/missing/build' });
   try {
     await bridge.start();
     await bridge.stop();
-    assert.equal(await (await fetch(url)).text(), identity);
+    assert.equal(await (await fetch(url)).text(), 'different backend');
   } finally { await close(server); }
+});
+
+test('waits for a backend reporting initialization without spawning a bridge', async () => {
+  let requests = 0;
+  const server = createServer((req, res) => {
+    assert.equal(req.url, '/v1/audio/health');
+    requests++;
+    res.statusCode = requests === 1 ? 503 : 200;
+    res.end(JSON.stringify({ status: requests === 1 ? 'initializing' : 'ready' }));
+  });
+  const url = await listen(server);
+  const bridge = new BridgeProcess(url, { executable: '/missing/build', pollIntervalMs: 20 });
+  try { await bridge.start(); assert.equal(requests, 2); }
+  finally { await bridge.stop(); await close(server); }
 });
 
 test('starts a child, waits for readiness, and cleans up only that child', async () => {
@@ -94,18 +116,23 @@ test('starts a child, waits for readiness, and cleans up only that child', async
     assert(alive(pid));
     await Promise.all([owned.bridge.stop(), owned.bridge.stop()]);
     assert.equal(alive(pid), false);
+    const replacement = await fixture(url);
+    try { await replacement.bridge.start(); }
+    finally { await replacement.dispose(); }
   } finally { await owned.dispose(); }
 });
 
 test('missing executable and occupied endpoint have actionable errors', async () => {
-  const missing = new BridgeProcess(await unusedUrl(), { executable: '/missing/TTSBridge' });
+  const missing = new BridgeProcess(await unusedUrl(), {
+    executable: '/missing/TTSBridge', startupLockPort: Number(new URL(await unusedUrl()).port),
+  });
   await assert.rejects(missing.start(), /Cannot execute.*npm run setup/);
   await missing.stop();
   const server = createServer((req, res) => res.end('different service'));
   const url = await listen(server);
   const occupied = new BridgeProcess(url);
   try {
-    await assert.rejects(occupied.start(), /occupied.*Free port 9000/);
+    await assert.rejects(occupied.start(), /does not implement GET.*health.*Free port 9000/);
   } finally { await occupied.stop(); await close(server); }
 });
 
@@ -152,21 +179,49 @@ test('shutdown cancels startup and removes the initializing child', async () => 
   } finally { await hung.dispose(); }
 });
 
-test('simultaneous starts can reuse the winner without killing its bridge', async () => {
+test('cold startup is serialized before spawning while the model initializes', async () => {
   const url = await unusedUrl();
-  const first = await fixture(url);
+  const first = await fixture(url, 'cold');
   const second = await fixture(url);
+  const starting = first.bridge.start();
   try {
-    await Promise.all([first.bridge.start(), second.bridge.start()]);
     const firstPid = await first.pid();
-    const secondPid = await second.pid();
-    // The losing child eventually exits after its bind fails.
-    for (let attempt = 0; attempt < 100 && alive(firstPid) && alive(secondPid); attempt++) await delay(10);
-    assert.notEqual(alive(firstPid), alive(secondPid));
-    const winner = alive(firstPid) ? first : second;
-    const loser = winner === first ? second : first;
-    await loser.bridge.stop();
-    assert.equal(await (await fetch(url)).text(), identity);
-    assert(alive(await winner.pid()));
+    assert.equal(await TtsClient.checkReadiness(url, new AbortController().signal), 'unavailable');
+    await Promise.all([starting, second.bridge.start()]);
+    await assert.rejects(readFile(second.pidFile), { code: 'ENOENT' });
+    await second.bridge.stop();
+    assert.equal(await TtsClient.checkReadiness(url, new AbortController().signal), 'ready');
+    assert(alive(firstPid));
   } finally { await first.dispose(); await second.dispose(); }
+});
+
+test('cancelling a startup waiter does not stop the owner or launch another child', async () => {
+  const url = await unusedUrl();
+  const first = await fixture(url, 'hang');
+  const second = await fixture(url);
+  const ownerStarting = assert.rejects(first.bridge.start(), /abort/i);
+  try {
+    const pid = await first.pid();
+    const waiting = assert.rejects(second.bridge.start(), /abort/i);
+    await delay(80);
+    await assert.rejects(readFile(second.pidFile), { code: 'ENOENT' });
+    await second.bridge.stop();
+    await waiting;
+    assert(alive(pid));
+    await first.bridge.stop();
+    await ownerStarting;
+  } finally { await first.dispose(); await second.dispose(); }
+});
+
+test('an occupied coordination port times out without spawning', async () => {
+  const lockServer = createServer();
+  const lockUrl = await listen(lockServer);
+  const bridge = new BridgeProcess(await unusedUrl(), {
+    executable: '/missing/build', startupLockPort: Number(new URL(lockUrl).port),
+    startupTimeoutMs: 100, pollIntervalMs: 20,
+  });
+  try {
+    await assert.rejects(bridge.start(), /startup coordination.*coordination port is available/);
+    assert(lockServer.listening);
+  } finally { await bridge.stop(); await close(lockServer); }
 });
