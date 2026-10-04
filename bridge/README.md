@@ -8,6 +8,8 @@ It exists because a real NVIDIA TTS NIM needs a Linux box with an NVIDIA GPU (Co
 
 ## Build / run
 
+Build/install is a prerequisite. Once built, the Codex MCP plugin launches this executable automatically when no healthy local bridge exists, waits for the model to initialize, and stops only the bridge child it owns. Swift remains a separate process. Manual startup is still useful for standalone CLI/hooks and diagnosing first-use initialization:
+
 From the repo root:
 
 ```bash
@@ -23,6 +25,8 @@ swift run --package-path bridge TTSBridge
 ```
 
 First run downloads the model from HuggingFace (roughly a minute) and caches it outside this repo at `~/.cache/fluidaudio/Models/` — that cache is FluidAudio's own convention, not something this repo controls.
+
+Later runs load cached assets; they do not reinstall or rebuild anything. HTTP starts only after `manager.initialize` completes, so the identifying `GET /` response indicates readiness without synthesizing audio. MCP waits up to five minutes; if first-use downloads take longer, complete initialization manually and restart MCP.
 
 The server listens on `127.0.0.1:9000` and preloads one voice at startup (`am_michael`, set in `Sources/TTSBridge/main.swift`).
 

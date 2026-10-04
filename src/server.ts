@@ -2,6 +2,9 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import * as z from 'zod/v4';
 import { createVoiceService } from './create-voice-service.js';
+import { isBundledTtsUrl, loadConfig } from './config.js';
+import { BridgeProcess } from './tts/bridge-process.js';
+import type { VoiceService } from './voice/voice-service.js';
 
 const speakInput = z.object({
   text: z
@@ -13,9 +16,9 @@ const speakInput = z.object({
     .describe('Optional reason for speaking. Metadata only in the MVP.'),
 });
 
-function buildServer(): McpServer {
+function buildServer(voice: VoiceService, ready: Promise<void>, onclose: () => void): McpServer {
   const server = new McpServer({ name: 'agentic-voice', version: '0.1.0' });
-  const voice = createVoiceService();
+  server.server.onclose = onclose;
 
   server.registerTool(
     'speak',
@@ -27,6 +30,7 @@ function buildServer(): McpServer {
     },
     async ({ text }) => {
       try {
+        await ready;
         await voice.speak(text);
         return {
           content: [{ type: 'text', text: 'Spoken successfully.' }],
@@ -44,5 +48,41 @@ function buildServer(): McpServer {
   return server;
 }
 
-void serveStdio(buildServer);
-console.error('agentic-voice MCP server running on stdio');
+function main(): void {
+  const config = loadConfig();
+  const local = isBundledTtsUrl(config.ttsUrl);
+  // The bundled bridge binds IPv4 only; localhost may resolve to IPv6 first.
+  if (local) config.ttsUrl = 'http://127.0.0.1:9000';
+  const voice = createVoiceService(config);
+  const bridge = local ? new BridgeProcess(config.ttsUrl) : undefined;
+  let handle: ReturnType<typeof serveStdio> | undefined;
+  let shutdown: Promise<void> | undefined;
+  const close = (): void => {
+    shutdown ??= (async () => {
+      await bridge?.stop();
+      await handle?.close();
+    })().finally(() => process.exit(process.exitCode ?? 0));
+  };
+  process.stdin.once('end', close);
+  process.stdin.once('close', close);
+  process.once('SIGINT', close);
+  process.once('SIGTERM', close);
+  const ready = bridge?.start() ?? Promise.resolve();
+  void ready.catch((error: unknown) => {
+    if (shutdown) return;
+    console.error(`agentic-voice: startup failed: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+    close();
+  });
+  handle = serveStdio(() => buildServer(voice, ready, close), {
+    onerror: (error) => console.error(`agentic-voice MCP: ${error.message}`),
+  });
+  console.error('agentic-voice MCP server running on stdio');
+}
+
+try {
+  main();
+} catch (error) {
+  console.error(`agentic-voice: startup failed: ${error instanceof Error ? error.message : String(error)}`);
+  process.exitCode = 1;
+}
