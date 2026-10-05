@@ -1,6 +1,9 @@
 {
   "name": "agentic-voice",
   "version": "0.1.0",
-  "description": "Voice notifications for coding agents: speaks when a turn ends or the agent needs your input.",
-  "author": { "name": "Maxim Anatsko", "email": "max.anatsko.work@gmail.com" }
+  "description": "Voice notifications for coding agents: speaks turn summaries and questions, and when a permission prompt needs your input.",
+  "author": { "name": "Maxim Anatsko", "email": "max.anatsko.work@gmail.com" },
+  "mcpServers": {
+    "agentic-voice": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/dist/src/server.js"] }
+  }
 }

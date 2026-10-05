@@ -135,23 +135,17 @@ speak({ text, kind? })
 
 `kind` is optional metadata: `question`, `completion`, `alert`, or `custom`. It currently does not change synthesis behavior; keeping it in the contract leaves room for small policy changes without creating separate tools.
 
-Recommended agent instruction:
-
-```text
-Use the speak tool only when you need a user decision, hit a blocker that needs attention,
-or finish a meaningful task. Summarize for listening; do not read code, paths, logs, or long
-technical output aloud. Keep the spoken message to one or two short sentences.
-```
+The server sends MCP `instructions` telling the agent when to speak: a one- or two-sentence summary when it finishes a turn of work, the question itself when it needs input (in addition to showing it as text), and blockers. Spoken text is written for listening, never code, paths, or logs. See `instructions` in [`src/server.ts`](src/server.ts).
 
 ## Lifecycle hooks
 
-The `speak` MCP tool above already covers rich, context-aware notifications — the agent decides when to call it and summarizes for itself. The hooks below are a different, deterministic thing: a fixed-phrase backstop for the two moments an LLM isn't available to summarize anything — the turn just ended, or the tool is blocked waiting on you. They intentionally do **not** parse a transcript or try to be clever; that would duplicate what `speak` already does properly, and a shell hook has no LLM in the loop to summarize with.
+The `speak` MCP tool above already covers rich, context-aware notifications — the agent decides when to call it and summarizes for itself. The hooks below are a different, deterministic thing: a fixed-phrase backstop for the moment an LLM can't speak for itself — the tool is blocked waiting on you. Where the `speak` tool is registered (Claude Code and Codex CLI), turn endings are spoken by the agent as a summary, so there is no fixed "finished" hook. They intentionally do **not** parse a transcript or try to be clever; that would duplicate what `speak` already does properly, and a shell hook has no LLM in the loop to summarize with.
 
-Two events, two fixed phrase templates, one shared script (`hooks/speak-notify.sh`). The script prefixes each phrase with the calling project's directory name (`basename "$PWD"`, the hook's own `cwd`) so overlapping sessions across projects are distinguishable — it's still fully deterministic, just reading a directory name, not summarizing anything:
+Fixed phrase templates, one shared script (`hooks/speak-notify.sh`). The script prefixes each phrase with the calling project's directory name (`basename "$PWD"`, the hook's own `cwd`) so overlapping sessions across projects are distinguishable — it's still fully deterministic, just reading a directory name, not summarizing anything:
 
 | Event | Phrase |
 | --- | --- |
-| Turn/task finished (Claude Code `Stop`, Codex CLI `Stop`, opencode `session.idle`) | `"<project> finished."` |
+| Turn/task finished (opencode `session.idle` only) | `"<project> finished."` |
 | Waiting on you (Claude Code `Notification`, Codex CLI `PermissionRequest`, opencode `permission.ask`) | `"<project> needs your input."` |
 
 For example, running in this repo: "agentic-voice finished." / "agentic-voice needs your input."
@@ -174,7 +168,7 @@ codex plugin add agentic-voice@agentic-voice
 
 Check it loaded cleanly: `claude plugin details agentic-voice` / `codex plugin list --json`. To remove: `claude plugin uninstall agentic-voice && claude plugin marketplace remove agentic-voice`, `codex plugin remove agentic-voice@agentic-voice && codex plugin marketplace remove agentic-voice`.
 
-The Codex plugin registers the stdio MCP server as well as hooks. After installation, run setup in the installed plugin copy if its build artifacts are missing, then reload Codex so it loads the new manifest and built files. Codex can omit the Swift `.build` directory when copying a local plugin, even if you already built the source checkout. The `speak` tool then becomes available and MCP manages the local bridge. Claude Code's plugin registration remains hooks-only.
+Both the Claude Code and Codex plugins register the stdio MCP server as well as hooks. After installation, run setup in the installed plugin copy if its build artifacts are missing, then reload Codex so it loads the new manifest and built files. Codex can omit the Swift `.build` directory when copying a local plugin, even if you already built the source checkout. The `speak` tool then becomes available and MCP manages the local bridge. For Claude Code, run the same setup in the installed copy (`~/.claude/plugins/cache/agentic-voice/agentic-voice/<version>`) after installing or updating.
 
 For an existing installation from this local marketplace, reinstall:
 

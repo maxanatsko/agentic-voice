@@ -16,8 +16,16 @@ const speakInput = z.object({
     .describe('Optional reason for speaking. Metadata only in the MVP.'),
 });
 
+const instructions = [
+  'The user listens for spoken updates. Call speak at these moments, in addition to your normal text reply:',
+  '- When you finish a turn of work: one or two sentences summarizing the outcome.',
+  '- When you need input or a decision: speak the question, then also show it as text or through your question tool.',
+  '- When you hit a blocker that needs attention.',
+  'Write for listening: no code, paths, logs, or long technical output. Do not speak for routine progress.',
+].join('\n');
+
 function buildServer(voice: VoiceService, ready: Promise<void>, onclose: () => void): McpServer {
-  const server = new McpServer({ name: 'agentic-voice', version: '0.1.0' });
+  const server = new McpServer({ name: 'agentic-voice', version: '0.1.0' }, { instructions });
   server.server.onclose = onclose;
 
   server.registerTool(
