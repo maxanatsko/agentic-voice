@@ -68,11 +68,12 @@ function main(): void {
   process.once('SIGINT', close);
   process.once('SIGTERM', close);
   const ready = bridge?.start() ?? Promise.resolve();
+  // Stay connected after a bridge failure: speak reports the error to the client,
+  // which otherwise sees only a dropped connection after a successful handshake.
   void ready.catch((error: unknown) => {
     if (shutdown) return;
-    console.error(`agentic-voice: startup failed: ${error instanceof Error ? error.message : String(error)}`);
-    process.exitCode = 1;
-    close();
+    console.error(`agentic-voice: bridge startup failed: ${error instanceof Error ? error.message : String(error)}`);
+    void bridge?.stop();
   });
   handle = serveStdio(() => buildServer(voice, ready, close), {
     onerror: (error) => console.error(`agentic-voice MCP: ${error.message}`),
