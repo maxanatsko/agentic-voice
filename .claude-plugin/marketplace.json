@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "agentic-voice",
   "description": "Local voice-notification hooks for agentic-voice.",
-  "owner": { "name": "Maxim Anatsko", "email": "max.anatsko.work@gmail.com" },
+  "owner": { "name": "Maxim Anatsko", "email": "max@maxanatsko.com" },
   "plugins": [
     {
       "name": "agentic-voice",
