@@ -7,7 +7,7 @@
     {
       "name": "agentic-voice",
       "description": "Voice notifications when a turn ends or input is needed.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "source": "./",
       "category": "productivity"
     }

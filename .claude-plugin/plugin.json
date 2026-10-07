@@ -1,6 +1,6 @@
 {
   "name": "agentic-voice",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Voice notifications for coding agents: speaks turn summaries and questions, and when a permission prompt needs your input.",
   "author": { "name": "Maxim Anatsko", "email": "max@maxanatsko.com" },
   "mcpServers": {
