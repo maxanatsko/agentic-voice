@@ -57,13 +57,20 @@ struct GeneralTab: View {
         Form {
             Section("Speech") {
                 Picker("Voice", selection: Binding(get: { model.selectedVoice }, set: { model.select(voice: $0) })) {
-                    ForEach(VoiceCatalog.voices.filter { model.installedVoices.contains($0.id) }) { voice in
-                        Text("\(voice.name) — \(voice.accent)").tag(voice.id)
+                    // The selected voice stays listed when it's missing, so the picker says why speech fails.
+                    ForEach(VoiceCatalog.voices.filter { model.installedVoices.contains($0.id) || $0.id == model.selectedVoice }) { voice in
+                        Text(model.installedVoices.contains(voice.id) ? "\(voice.name) — \(voice.accent)" : "\(voice.name) — not installed").tag(voice.id)
                     }
                 }
                 LabeledContent("Speed") {
                     HStack {
-                        Slider(value: $speed, in: 0.5...2.0, step: 0.05)
+                        // Saved when the drag ends, not on every step.
+                        Slider(value: $speed, in: 0.5...2.0, step: 0.05) { editing in
+                            guard !editing else { return }
+                            model.set(speed: speed)
+                            // A failed save leaves the setting unchanged; show that rather than the attempt.
+                            speed = model.speed
+                        }
                         Text(String(format: "%.2f×", speed)).monospacedDigit().frame(width: 52, alignment: .trailing)
                     }
                 }
@@ -95,11 +102,6 @@ struct GeneralTab: View {
         }
         .formStyle(.grouped)
         .onAppear { speed = model.speed }
-        .onChange(of: speed) { _, speed in
-            model.set(speed: speed)
-            // A failed save leaves the setting unchanged; show that rather than the attempt.
-            if model.settings.speed ?? 1.0 != (speed * 100).rounded() / 100 { self.speed = model.speed }
-        }
         .onChange(of: model.settings) { _, settings in speed = settings.speed ?? 1.0 }
     }
 }
@@ -121,8 +123,9 @@ struct VoicesTab: View {
                 } else if model.installedVoices.contains(voice.id) {
                     Button("Preview") { Task { await model.play(voice) } }
                         .disabled(!model.engineReady || model.previewing)
+                    // The engine reinstalls the default voice, and af_heart, which ships with the model, on its next start.
                     Button("Delete") { model.remove(voice) }
-                        .disabled(voice.id == model.selectedVoice)
+                        .disabled(voice.id == model.selectedVoice || voice.id == VoiceCatalog.defaultVoice || voice.id == "af_heart")
                 } else {
                     Button("Install") { Task { await model.install(voice) } }
                 }
