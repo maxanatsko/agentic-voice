@@ -40,7 +40,7 @@ final class BridgeHost: ObservableObject {
         task = Task { await run() }
     }
 
-    /// Stops serving; any agentic-voice process that was using this bridge will start its own.
+    /// Stops serving. MCP servers that were using this bridge can't speak until they restart.
     func stop() async {
         task?.cancel()
         task = nil
@@ -85,11 +85,16 @@ final class BridgeHost: ObservableObject {
 
     private func serve() async throws {
         state = .preparing("Preparing the voice model…", fraction: nil)
-        let manager = try await BridgeServer.prepare(defaultVoice: VoiceCatalog.defaultVoice) { [weak self] progress in
+        let manager = try await BridgeServer.prepare { [weak self] progress in
             Task { @MainActor in self?.show(progress) }
         }
         let app = try await BridgeServer.makeApplication(manager: manager)
-        try await app.startup()
+        do {
+            try await app.startup()
+        } catch {
+            try? await app.asyncShutdown()
+            throw error
+        }
         self.app = app
         // Vapor's serve command takes over SIGTERM and SIGINT and only reports them through
         // `running`, which nothing else here waits on; quit as the signal asks.
