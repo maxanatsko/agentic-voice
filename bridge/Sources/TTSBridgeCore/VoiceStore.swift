@@ -35,17 +35,20 @@ public enum VoiceStore {
         directory.appendingPathComponent("\(id).bin")
     }
 
+    /// Also keeps an id from naming a path outside the cache.
+    static func isValid(_ id: String) -> Bool {
+        id.range(of: "^[a-z]{2}_[a-z]+$", options: .regularExpression) != nil
+    }
+
     public static func isInstalled(_ id: String) -> Bool {
-        FileManager.default.fileExists(atPath: file(for: id).path)
+        isValid(id) && FileManager.default.fileExists(atPath: file(for: id).path)
     }
 
     /// Downloads the official Kokoro `.pt` voice and extracts its tensor. No Python or torch is
     /// needed: a `.pt` voice is an uncompressed zip whose `<voice>/data/0` entry already holds the
     /// little-endian float32 bytes FluidAudio reads.
     public static func install(_ id: String) async throws {
-        guard id.range(of: "^[a-z]{2}_[a-z]+$", options: .regularExpression) != nil else {
-            throw VoiceStoreError.invalidId(id)
-        }
+        guard isValid(id) else { throw VoiceStoreError.invalidId(id) }
         if isInstalled(id) { return }
 
         let remote = URL(string: "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/\(id).pt")!
@@ -62,6 +65,7 @@ public enum VoiceStore {
     }
 
     public static func remove(_ id: String) throws {
+        guard isValid(id) else { throw VoiceStoreError.invalidId(id) }
         guard isInstalled(id) else { return }
         try FileManager.default.removeItem(at: file(for: id))
     }
