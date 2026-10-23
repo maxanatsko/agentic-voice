@@ -112,7 +112,7 @@ struct VoicesTab: View {
         List(VoiceCatalog.voices) { voice in
             HStack {
                 VStack(alignment: .leading) {
-                    Text(voice.name) + Text(voice.id == model.selectedVoice ? "  (default)" : "").foregroundColor(.secondary)
+                    Text("\(voice.name)\(Text(voice.id == model.selectedVoice ? "  (default)" : "").foregroundStyle(.secondary))")
                     Text("\(voice.accent) · \(voice.id)").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
