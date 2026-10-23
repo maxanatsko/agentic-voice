@@ -150,6 +150,37 @@ test('refuses a codex table defined outside the managed block, however it is wri
       header,
     );
   }
+  for (const header of ['[mcp_servers]\nagentic-voice = { command = "node" }', '[mcp_servers]\n"agentic-voice".command = "node"']) {
+    assert.throws(
+      () => upsertTomlBlock(`${header}\n`, 'config.toml', 'mcp_servers.agentic-voice', 'command = "x"\n'),
+      /already defines agentic-voice/,
+      header,
+    );
+  }
+});
+
+test('accepts agentic-voice keys outside mcp_servers, such as a Codex plugin marketplace', () => {
+  const codex = [
+    '[marketplaces.agentic-voice]', 'source = "/Users/me/agentic-voice"', '',
+    '[plugins."agentic-voice@agentic-voice"]', 'enabled = true', '',
+    '[mcp_servers.other]', 'command = "other"', 'agentic-voice = "not a server"', '',
+  ].join('\n');
+  assert.match(
+    upsertTomlBlock(codex, 'config.toml', 'mcp_servers.agentic-voice', 'command = "x"\n'),
+    /\[mcp_servers\.agentic-voice\]\ncommand = "x"\n/,
+  );
+});
+
+test('uninstalling the only hook leaves no empty hooks object behind', async () => {
+  const f = await fixture();
+  try {
+    await f.put('.claude/settings.json', JSON.stringify({ model: 'opus' }));
+    await installClient(f.context, 'claude-code');
+    await uninstallClient(f.context, 'claude-code');
+    assert.deepEqual(await f.json('.claude/settings.json'), { model: 'opus' });
+  } finally {
+    await f.dispose();
+  }
 });
 
 test('keeps other commands that share a hook group with ours', async () => {
