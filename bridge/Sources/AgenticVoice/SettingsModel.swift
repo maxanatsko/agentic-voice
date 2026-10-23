@@ -37,7 +37,10 @@ final class SettingsModel: ObservableObject {
             message = error.localizedDescription
         }
         refreshVoices()
+        // Clients show as loading, not as failed, while the shell PATH resolves.
+        busyClients = true
         shellPath = await Task.detached { BundledNode.loginShellPath() }.value
+        busyClients = false
         await runInstaller("status")
     }
 

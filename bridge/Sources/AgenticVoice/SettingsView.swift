@@ -7,6 +7,7 @@ import TTSBridgeCore
 @MainActor
 enum SettingsWindow {
     private static var window: NSWindow?
+    private static var model: SettingsModel?
 
     static func show(host: BridgeHost) {
         if window == nil {
@@ -23,8 +24,10 @@ enum SettingsWindow {
             window.setContentSize(NSSize(width: 720, height: 560))
             window.center()
             self.window = window
-            Task { await model.load() }
+            self.model = model
         }
+        // Reread on every open: settings and clients may have changed from the terminal since.
+        if let model { Task { await model.load() } }
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }
@@ -84,16 +87,17 @@ struct PaneIcon: View {
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var host: BridgeHost
-    @State private var selection: SettingsPane? = .general
+    @State private var selection = SettingsPane.general
 
     var body: some View {
         NavigationSplitView {
-            List(SettingsPane.allCases, selection: $selection) { pane in
+            // A pane is always selected; deselecting would leave the sidebar and detail disagreeing.
+            List(SettingsPane.allCases, selection: Binding(get: { selection }, set: { if let pane = $0 { selection = pane } })) { pane in
                 Label { Text(pane.rawValue) } icon: { PaneIcon(pane: pane) }
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
         } detail: {
-            let pane = selection ?? .general
+            let pane = selection
             Form {
                 Section {
                     VStack(spacing: 6) {
@@ -111,6 +115,9 @@ struct SettingsView: View {
                 }
             }
             .formStyle(.grouped)
+            // A Form per pane, so each opens scrolled to the top.
+            .id(pane)
+            .onAppear { model.refreshVoices() }
             .navigationTitle(pane.rawValue)
             // The pane header already names it, as in System Settings.
             .toolbar(removing: .title)
@@ -158,6 +165,8 @@ struct GeneralTab: View {
                             speed = model.speed
                         }
                         .labelsHidden()
+                        .onAppear { speed = model.speed }
+                        .onChange(of: model.settings) { _, settings in speed = settings.speed ?? 1.0 }
                         Text(String(format: "%.2f×", speed)).monospacedDigit().foregroundStyle(.secondary).frame(width: 44, alignment: .trailing)
                     }
                 }
@@ -177,8 +186,6 @@ struct GeneralTab: View {
                 }
             }
         }
-        .onAppear { speed = model.speed }
-        .onChange(of: model.settings) { _, settings in speed = settings.speed ?? 1.0 }
     }
 }
 
@@ -214,6 +221,7 @@ struct VoicesTab: View {
     }
 
     var body: some View {
+        let accents = accents
         Group {
             ForEach(accents, id: \.name) { accent in
                 Section {
@@ -228,7 +236,6 @@ struct VoicesTab: View {
                 }
             }
         }
-        .onAppear { model.refreshVoices() }
     }
 
     private func row(_ voice: Voice) -> some View {
@@ -263,10 +270,16 @@ struct ClientsTab: View {
         Group {
             Section {
                 if model.clients.isEmpty {
-                    HStack {
-                        Spacer()
-                        ProgressView().controlSize(.small)
-                        Spacer()
+                    if model.busyClients {
+                        HStack {
+                            Spacer()
+                            ProgressView().controlSize(.small)
+                            Spacer()
+                        }
+                    } else {
+                        LabeledContent("Couldn't check the clients.") {
+                            Button("Retry") { Task { await model.load() } }
+                        }
                     }
                 }
                 ForEach(model.clients) { client in row(client) }
@@ -292,26 +305,26 @@ struct ClientsTab: View {
             .buttonBorderShape(.capsule)
             .disabled(model.busyClients)
         } label: {
+            let status = status(client)
             Label {
                 Text(client.name)
-                Text(statusText(client))
+                Text(status.text)
                 if let error = client.error {
                     Text(error).foregroundStyle(.red).textSelection(.enabled)
                 } else if let note = client.note {
                     Text(note)
                 }
             } icon: {
-                Image(systemName: client.installed ? (client.current ? "checkmark.circle.fill" : "exclamationmark.circle.fill") : "circle.dashed")
-                    .foregroundStyle(client.installed ? (client.current ? Color.green : Color.orange) : Color.secondary)
+                Image(systemName: status.symbol).foregroundStyle(status.color)
             }
         }
     }
 
-    private func statusText(_ client: ClientStatus) -> String {
+    private func status(_ client: ClientStatus) -> (text: String, symbol: String, color: Color) {
         switch (client.installed, client.current) {
-        case (true, true): return "Installed"
-        case (true, false): return "Installed with outdated paths"
-        case (false, _): return client.detected ? "Not installed" : "Not installed (not detected on this Mac)"
+        case (true, true): return ("Installed", "checkmark.circle.fill", .green)
+        case (true, false): return ("Installed with outdated paths", "exclamationmark.circle.fill", .orange)
+        case (false, _): return (client.detected ? "Not installed" : "Not installed (not detected on this Mac)", "circle.dashed", .secondary)
         }
     }
 }
