@@ -23,6 +23,14 @@ function parseObject(text: string, path: string, snippet: unknown): JsonObject {
   return parsed;
 }
 
+/** An existing value under `key` must be an object; replacing anything else would discard it. */
+function objectAt(root: JsonObject, key: string, path: string): JsonObject {
+  const value = root[key];
+  if (value === undefined) return {};
+  if (!isObject(value)) throw new Error(`${path}: "${key}" is not an object, so the file was left unchanged. Fix it, then install again.`);
+  return value;
+}
+
 function render(value: JsonObject): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
@@ -35,8 +43,7 @@ export function readJsonEntry(text: string, path: string, container: string, nam
 
 export function upsertJsonEntry(text: string, path: string, container: string, name: string, entry: unknown): string {
   const root = parseObject(text, path, { [container]: { [name]: entry } });
-  const servers = isObject(root[container]) ? root[container] : {};
-  return render({ ...root, [container]: { ...servers, [name]: entry } });
+  return render({ ...root, [container]: { ...objectAt(root, container, path), [name]: entry } });
 }
 
 export function removeJsonEntry(text: string, path: string, container: string, name: string): string {
@@ -78,7 +85,10 @@ export function readHookCommand(text: string, path: string, event: string): stri
 export function upsertHook(text: string, path: string, event: string, command: string): string {
   const group = { hooks: [{ type: 'command', command, timeout: 10 }] };
   const root = parseObject(text, path, { hooks: { [event]: [group] } });
-  const hooks = isObject(root.hooks) ? root.hooks : {};
+  const hooks = objectAt(root, 'hooks', path);
+  if (hooks[event] !== undefined && !Array.isArray(hooks[event])) {
+    throw new Error(`${path}: hooks "${event}" is not an array, so the file was left unchanged. Fix it, then install again.`);
+  }
   return render({ ...root, hooks: { ...hooks, [event]: [...withoutOurHooks(hookGroups(root, event)), group] } });
 }
 

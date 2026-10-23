@@ -123,7 +123,7 @@ printf '%s' "The task finished successfully." | npm run speak
 
 ## Install into clients
 
-`npm run clients -- <status|install|uninstall> [client...]` adds or removes the `agentic-voice` MCP server, and the input-needed hook where the client supports one, in each client's user-level config. The Agentic Voice macOS app runs the same command. Entries use absolute paths to the running `node` and to this checkout, so rerun `install` after moving either; `status` reports such entries as not `current`. Output is JSON, one object per client.
+`npm run clients -- <install|uninstall> <client...>` adds or removes the `agentic-voice` MCP server, and the input-needed hook where the client supports one, in each client's user-level config. The Agentic Voice macOS app runs the same command. Entries use absolute paths to the running `node` and to this checkout, so rerun `install` after moving either; `status` reports such entries as not `current`. Install and uninstall need the client names, so nothing is written to a client you did not pick; `npm run clients -- status [client...]` reports every client when none is named. Output is JSON, one object per client.
 
 | Client | MCP entry | Hook |
 | --- | --- | --- |
