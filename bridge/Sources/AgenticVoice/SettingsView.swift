@@ -92,6 +92,8 @@ struct GeneralTab: View {
         }
         .formStyle(.grouped)
         .onAppear { speed = model.speed }
+        // First-run preparation installs the default voice; pick it up once the engine is ready.
+        .onChange(of: host.state) { _, _ in model.refreshVoices() }
         .onChange(of: model.settings) { _, settings in speed = settings.speed ?? 1.0 }
     }
 }
@@ -112,7 +114,7 @@ struct VoicesTab: View {
                     ProgressView().controlSize(.small)
                 } else if model.installedVoices.contains(voice.id) {
                     Button("Preview") { Task { await model.play(voice) } }
-                        .disabled(!model.engineReady)
+                        .disabled(!model.engineReady || model.busyVoices.contains(voice.id))
                     Button("Delete") { model.remove(voice) }
                         .disabled(voice.id == model.selectedVoice)
                 } else {
@@ -120,6 +122,8 @@ struct VoicesTab: View {
                 }
             }
         }
+        .onAppear { model.refreshVoices() }
+        .onChange(of: host.state) { _, _ in model.refreshVoices() }
         .safeAreaInset(edge: .bottom) {
             Text("Voices download from hexgrad/Kokoro-82M (about 0.5 MB each).")
                 .font(.caption).foregroundStyle(.secondary)

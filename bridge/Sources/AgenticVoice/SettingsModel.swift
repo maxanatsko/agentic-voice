@@ -13,7 +13,6 @@ final class SettingsModel: ObservableObject {
     @Published var message: String?
 
     let host: BridgeHost
-    private let preview = VoicePreview()
     private var shellPath: String?
 
     init(host: BridgeHost) {
@@ -84,11 +83,17 @@ final class SettingsModel: ObservableObject {
     }
 
     func play(_ voice: Voice) async {
+        guard case .success(let node) = node, let path = shellPath else {
+            message = "Previews need Node \(NodeLocator.minimumMajor)+; set it up in General."
+            return
+        }
         busyVoices.insert(voice.id)
         defer { busyVoices.remove(voice.id) }
-        do {
-            try await preview.play(voice, speed: speed)
-        } catch {
+        let speed = speed
+        let result = await Task.detached {
+            Result { try VoicePreview.play(voice, speed: speed, node: node, path: path) }
+        }.value
+        if case .failure(let error) = result {
             message = error.localizedDescription
         }
     }

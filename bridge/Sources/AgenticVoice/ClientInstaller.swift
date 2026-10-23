@@ -12,35 +12,19 @@ struct ClientStatus: Decodable, Identifiable, Equatable, Sendable {
 }
 
 enum ClientInstallerError: Error, LocalizedError {
-    case notBundled
     case failed(String)
 
     var errorDescription: String? {
         switch self {
-        case .notBundled:
-            return "The MCP server isn't bundled with this copy of the app; build it with npm run app:build."
-        case .failed(let message):
-            return message
+        case .failed(let message): return message
         }
     }
 }
 
 /// Runs the bundled Node installer, which owns all client config editing.
 enum ClientInstaller {
-    /// The repository layout copied into the app by scripts/build-app.sh.
-    static var pluginRoot: URL? {
-        guard let root = Bundle.main.resourceURL?.appendingPathComponent("agentic-voice"),
-              FileManager.default.fileExists(atPath: root.appendingPathComponent("dist/src/install-clients.js").path)
-        else { return nil }
-        return root
-    }
-
     static func run(_ command: String, clients: [String] = [], node: NodeInstall, path: String) throws -> [ClientStatus] {
-        guard let root = pluginRoot else { throw ClientInstallerError.notBundled }
-        var environment = ProcessInfo.processInfo.environment
-        environment["PATH"] = path
-        let script = root.appendingPathComponent("dist/src/install-clients.js").path
-        let result = try Shell.run(node.path, [script, command] + clients, environment: environment)
+        let result = try BundledNode.run("install-clients.js", [command] + clients, node: node, path: path)
         // Per-client failures still print every status (with an error) and exit 1.
         if let statuses = try? JSONDecoder().decode([ClientStatus].self, from: Data(result.stdout.utf8)) {
             return statuses

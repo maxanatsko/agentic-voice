@@ -134,7 +134,7 @@ Move it to `/Applications` and open it. On first run it downloads the model and 
 Settings has three tabs:
 
 - **General**: the default voice and speed, saved to the shared settings file and applied on every agent's next spoken message. Also shows the voice engine's status and which Node 26+ binary the app found, with a way to choose one by hand.
-- **Voices**: install, preview or delete any of the 28 English voices. Preview takes the same speaking lock as agents, so it never talks over them.
+- **Voices**: install, preview or delete any of the 28 English voices. Preview speaks through the bundled CLI, the same path agents use, so it takes the same speaking lock and never talks over them.
 - **Clients**: install, update or uninstall agentic-voice in each client by running the bundled `install-clients` (see below) with the found Node binary and your login shell's `PATH`.
 
 ## Install into clients
