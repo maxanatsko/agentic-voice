@@ -18,7 +18,7 @@ Keep boundaries explicit:
 - Configuration parsing stays in `config.ts`.
 - `bridge/` is a separate Swift package with its own toolchain; Node code must depend on it only through the documented HTTP contract, never by assuming its internals.
 - In `bridge/`, `TTSBridgeCore` owns the HTTP routes, model preparation and voice installation; the `TTSBridge` executable and the app only run it.
-- The macOS app is presentation only. It hosts `TTSBridgeCore`, writes the shared settings file, and runs `install-clients` for client config; it never parses config or edits client files itself.
+- The macOS app is presentation only. It hosts `TTSBridgeCore`, writes the shared settings file, and runs the bundled Node scripts (`install-clients`, the CLI for previews) on the Node runtime it bundles; it never edits client files or calls the TTS backend itself.
 - Client config editing stays in `src/clients/` (pure text edits in `config-edit.ts`, file handling in `clients.ts`).
 - `~/Library/Application Support/AgenticVoice/config.json` is the only persisted setting. `config.ts` defines its format; the app reads and writes only `voice` and `speed`, applying the same rules. The app speaks (voice preview) only through the bundled CLI, never by calling the synthesis endpoint itself; its only HTTP request is the health check in the bridge startup protocol.
 

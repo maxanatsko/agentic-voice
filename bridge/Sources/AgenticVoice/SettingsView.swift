@@ -83,22 +83,6 @@ struct GeneralTab: View {
                     Button("Retry") { host.start() }
                 }
             }
-            Section("Node.js") {
-                switch model.node {
-                case .none:
-                    ProgressView().controlSize(.small)
-                case .success(let node):
-                    Text("Node \(node.version) at \(node.path)").textSelection(.enabled)
-                case .failure(let error):
-                    Text(error.localizedDescription).foregroundStyle(.red)
-                }
-                HStack {
-                    Button("Choose…") { Task { await model.chooseNode() } }
-                    if NodeLocator.chosenPath != nil {
-                        Button("Detect Automatically") { Task { await model.useDetectedNode() } }
-                    }
-                }
-            }
         }
         .formStyle(.grouped)
         .onAppear { speed = model.speed }
@@ -144,9 +128,6 @@ struct ClientsTab: View {
 
     var body: some View {
         VStack(alignment: .leading) {
-            if case .failure = model.node {
-                Text("Clients need Node \(NodeLocator.minimumMajor)+; set it up in General.").foregroundStyle(.red)
-            }
             List(model.clients) { client in
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -168,7 +149,7 @@ struct ClientsTab: View {
                         Button("Install") { Task { await model.install(client: client) } }
                     }
                 }
-                .disabled(model.busyClients || !model.nodeReady)
+                .disabled(model.busyClients)
             }
             Text("Restart a client after installing or uninstalling. Original config files are backed up once as <file>.agentic-voice-backup.")
                 .font(.caption).foregroundStyle(.secondary)

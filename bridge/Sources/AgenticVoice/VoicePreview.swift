@@ -17,10 +17,10 @@ enum VoicePreviewError: Error, LocalizedError {
 /// does: the same TTS client, the same speaking lock, the same playback.
 enum VoicePreview {
     /// Blocking; call off the main actor.
-    static func play(_ voice: Voice, speed: Double, node: NodeInstall, path: String) throws {
+    static func play(_ voice: Voice, speed: Double, path: String) throws {
         let result = try BundledNode.run(
             "cli.js", ["Hi, I'm \(voice.name). This is how I sound."],
-            node: node, path: path,
+            path: path,
             environment: ["TTS_VOICE": voice.id, "VOICE_SPEED": String(speed)]
         )
         switch result.status {

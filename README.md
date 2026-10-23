@@ -123,7 +123,7 @@ printf '%s' "The task finished successfully." | npm run speak
 
 ## macOS app
 
-`Agentic Voice.app` is a menu bar app (no Dock icon) that keeps the voice engine running at `127.0.0.1:9000`, so MCP servers, the CLI and hooks always find a bridge to use, and none of them owns it. Build it from source on an Apple Silicon Mac running macOS 26+, with Node 26+ and Xcode 26+:
+`Agentic Voice.app` is a menu bar app (no Dock icon) that keeps the voice engine running at `127.0.0.1:9000`, so MCP servers, the CLI and hooks always find a bridge to use, and none of them owns it. Build it from source on an Apple Silicon Mac running macOS 26+, with Node 26+ and Xcode 26+. The app itself bundles the official Node runtime (26.12.1, checksum-verified at build time), so people who only run the app don't need Node installed:
 
 ```bash
 npm run app:build   # → build/Agentic Voice.app (ad-hoc signed, not notarized)
@@ -133,9 +133,9 @@ Move it to `/Applications` and open it. On first run it downloads the model and 
 
 Settings has three tabs:
 
-- **General**: the default voice and speed, saved to the shared settings file and applied on every agent's next spoken message. Also shows the voice engine's status and which Node 26+ binary the app found, with a way to choose one by hand.
+- **General**: the default voice and speed, saved to the shared settings file and applied on every agent's next spoken message. Also shows the voice engine's status.
 - **Voices**: install, preview or delete any of the 28 English voices. Preview speaks through the bundled CLI, the same path agents use, so it takes the same speaking lock and never talks over them.
-- **Clients**: install, update or uninstall agentic-voice in each client by running the bundled `install-clients` (see below) with the found Node binary and your login shell's `PATH`.
+- **Clients**: install, update or uninstall agentic-voice in each client by running the bundled `install-clients` (see below) on the bundled Node, with your login shell's `PATH` so it can find `claude`. Client entries and hooks point at the bundled Node, so they show as outdated if you move the app; Update fixes them.
 
 ## Install into clients
 
