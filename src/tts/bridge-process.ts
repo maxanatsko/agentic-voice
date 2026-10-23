@@ -26,7 +26,7 @@ export class BridgeProcess {
   private unlocking?: Promise<void>;
 
   constructor(private readonly url: string, private readonly options: BridgeOptions = {}) {
-    this.executable = options.executable ?? join(pluginRoot, 'bridge/.build/debug/TTSBridge');
+    this.executable = options.executable ?? join(pluginRoot, 'bridge/.build/release/TTSBridge');
   }
 
   private async acquireStartupLock(): Promise<boolean> {
