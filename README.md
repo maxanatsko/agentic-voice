@@ -50,7 +50,7 @@ Responsibilities are intentionally narrow:
 
 - Node.js 22+
 - A built bundled bridge, or an externally managed TTS backend. MCP automatically starts the bundled bridge at `http://127.0.0.1:9000` when needed.
-- To build/run the bundled bridge: Xcode 15+ / Swift 5.9+ (macOS, Apple Silicon).
+- To build/run the bundled bridge: macOS 26+ on Apple Silicon with Xcode 26+ / Swift 6.2+.
 - A local WAV player: `afplay` on macOS or `aplay` on Linux, unless overridden.
 
 The TTS backend can run on a separate machine reachable over HTTP — set `TTS_URL` to that host.
