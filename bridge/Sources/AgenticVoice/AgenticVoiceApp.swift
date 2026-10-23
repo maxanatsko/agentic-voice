@@ -26,13 +26,13 @@ struct MenuContent: View {
     var body: some View {
         Text(host.state.summary)
         if case .failed = host.state {
-            Button("Retry") { host.start() }
+            Button("Retry", systemImage: "arrow.clockwise") { host.start() }
         }
         if let loginItemError {
             Text(loginItemError)
         }
         Divider()
-        Button("Settings…") { SettingsWindow.show(host: host) }
+        Button("Settings…", systemImage: "gearshape") { SettingsWindow.show(host: host) }
             .keyboardShortcut(",")
         Toggle("Launch at Login", isOn: $launchAtLogin)
             .onChange(of: launchAtLogin) { _, enabled in
@@ -47,7 +47,7 @@ struct MenuContent: View {
                 }
             }
         Divider()
-        Button("Quit Agentic Voice") {
+        Button("Quit Agentic Voice", systemImage: "power") {
             Task {
                 await host.stop()
                 NSApp.terminate(nil)
