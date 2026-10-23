@@ -62,6 +62,10 @@ cp .env.example .env
 
 Create `.env` in the plugin/repository root. MCP and CLI resolve it from their installed module location, independently of the calling project's working directory. Existing environment variables take precedence over `.env`.
 
+Voice and speed can also come from the shared settings file `~/Library/Application Support/AgenticVoice/config.json` (`{"voice": "af_bella", "speed": 1.1}`), which the Agentic Voice macOS app writes. Precedence: environment variables, then `.env`, then the settings file, then defaults. The MCP server re-reads voice and speed on every `speak` call, so changes apply without a restart; `TTS_URL` is fixed when MCP starts.
+
+Hooks run in the agent's environment, which may not include your shell's `PATH`. Set `AGENTIC_VOICE_NODE` to an absolute `node` path for `hooks/speak-notify.sh` if `node` is not found there.
+
 Environment variables:
 
 | Variable | Default | Purpose |
