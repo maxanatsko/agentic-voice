@@ -14,10 +14,11 @@ public enum BridgeServer {
     public static let port = 9000
 
     /// Downloads whatever is missing and loads the model. Synthesis is available once this returns.
+    /// Always prepares `VoiceCatalog.defaultVoice`, the voice a request without one gets.
     public static func prepare(
-        defaultVoice: String = VoiceCatalog.defaultVoice,
         progress: (@Sendable (BridgeProgress) -> Void)? = nil
     ) async throws -> KokoroAneManager {
+        let defaultVoice = VoiceCatalog.defaultVoice
         let report: ProgressHandler = { progress?(.downloadingModel(fraction: $0.fractionCompleted)) }
         try await KokoroAneResourceDownloader.ensureModels(variant: .english, progressHandler: report)
         try await KokoroAneResourceDownloader.ensureG2PAssets(progressHandler: report)
