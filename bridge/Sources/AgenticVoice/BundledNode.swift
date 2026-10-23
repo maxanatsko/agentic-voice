@@ -23,10 +23,11 @@ enum BundledNode {
     }
 
     /// The login shell's PATH, so the installer can find `claude`. GUI apps don't inherit it.
-    /// Read from a marked line, because shell profiles may print banners of their own.
+    /// Interactive as well as login, because version managers such as nvm usually extend PATH in
+    /// ~/.zshrc or ~/.bashrc. Read from a marked line, because shell profiles may print banners.
     static func loginShellPath() -> String {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        if let result = try? Shell.run(shell, ["-l", "-c", "printf '\\n%s%s\\n' '\(pathMarker)' \"$PATH\""], timeout: 5),
+        if let result = try? Shell.run(shell, ["-l", "-i", "-c", "printf '\\n%s%s\\n' '\(pathMarker)' \"$PATH\""], timeout: 10),
            result.status == 0,
            let line = result.stdout.split(separator: "\n").last(where: { $0.hasPrefix(pathMarker) }),
            line.count > pathMarker.count {
