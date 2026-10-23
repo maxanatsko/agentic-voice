@@ -43,7 +43,8 @@ Responsibilities are intentionally narrow:
 - `src/tts/tts-client.ts` — TTS HTTP client only.
 - `src/tts/bridge-process.ts` — readiness and ownership of the separate bridge process.
 - `src/audio/audio-player.ts` — local playback only.
-- `src/config.ts` — environment configuration only.
+- `src/config.ts` — configuration (environment, `.env`, settings file) only.
+- `src/install-clients.ts` and `src/clients/` — writing agentic-voice entries into client config files only.
 
 ## Requirements
 
@@ -119,6 +120,22 @@ Or pipe text from a hook:
 ```bash
 printf '%s' "The task finished successfully." | npm run speak
 ```
+
+## Install into clients
+
+`npm run clients -- <status|install|uninstall> [client...]` adds or removes the `agentic-voice` MCP server, and the input-needed hook where the client supports one, in each client's user-level config. The Agentic Voice macOS app runs the same command. Entries use absolute paths to the running `node` and to this checkout, so rerun `install` after moving either; `status` reports such entries as not `current`. Output is JSON, one object per client.
+
+| Client | MCP entry | Hook |
+| --- | --- | --- |
+| `claude-code` | `claude mcp add-json -s user` | `Notification` in `~/.claude/settings.json` |
+| `claude-desktop` | `~/Library/Application Support/Claude/claude_desktop_config.json` | — |
+| `codex` | managed block in `~/.codex/config.toml` | `PermissionRequest` in `~/.codex/hooks.json` (trust it with `/hooks`) |
+| `cursor` | `~/.cursor/mcp.json` | — |
+| `vscode` | `~/Library/Application Support/Code/User/mcp.json` | — |
+| `windsurf` | `~/.codeium/windsurf/mcp_config.json` | — |
+| `opencode` | `~/.config/opencode/opencode.json` | plugin shim in `~/.config/opencode/plugins/` |
+
+Other entries are kept. The first change to an existing file saves the original next to it as `<file>.agentic-voice-backup`. A file that isn't plain JSON (for example, one with comments) is left unchanged, and the error shows the entry to add by hand. Restart a client after installing. Don't combine this with the agentic-voice plugin in the same client, or it will speak twice.
 
 ## TTS bridge (`bridge/`)
 
