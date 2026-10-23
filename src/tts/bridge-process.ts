@@ -2,8 +2,9 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { createServer, type Server } from 'node:net';
+import type { Server } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
+import { release, tryBindExclusive } from '../port-lock.js';
 import { pluginRoot } from '../runtime-paths.js';
 import { TtsClient } from './tts-client.js';
 
@@ -28,32 +29,28 @@ export class BridgeProcess {
     this.executable = options.executable ?? join(pluginRoot, 'bridge/.build/debug/TTSBridge');
   }
 
-  private acquireStartupLock(): Promise<boolean> {
-    const server = createServer((socket) => socket.destroy());
-    return new Promise((resolve, reject) => {
-      server.once('error', (error: NodeJS.ErrnoException) => {
-        if (error.code === 'EADDRINUSE') resolve(false);
-        else reject(new Error(`Cannot coordinate TTSBridge startup: ${error.message}`, { cause: error }));
-      });
-      server.listen({ host: '127.0.0.1', port: this.options.startupLockPort ?? 19000, exclusive: true }, () => {
-        if (this.abort.signal.aborted) {
-          server.close();
-          reject(this.abort.signal.reason);
-          return;
-        }
-        this.startupLock = server;
-        resolve(true);
-      });
-    });
+  private async acquireStartupLock(): Promise<boolean> {
+    const port = this.options.startupLockPort ?? 19000;
+    let server: Server | undefined;
+    try {
+      server = await tryBindExclusive(port);
+    } catch (error) {
+      throw new Error(`Cannot coordinate TTSBridge startup: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+    }
+    if (!server) return false;
+    if (this.abort.signal.aborted) {
+      await release(server);
+      throw this.abort.signal.reason;
+    }
+    this.startupLock = server;
+    return true;
   }
 
   private releaseStartupLock(): Promise<void> {
     const server = this.startupLock;
     if (!server) return this.unlocking ?? Promise.resolve();
     this.startupLock = undefined;
-    return this.unlocking = new Promise((resolve, reject) => {
-      server.close((error) => error ? reject(error) : resolve());
-    });
+    return this.unlocking = release(server);
   }
 
   async start(): Promise<void> {

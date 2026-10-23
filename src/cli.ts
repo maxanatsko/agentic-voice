@@ -16,7 +16,10 @@ function readText(): string {
 
 async function main(): Promise<void> {
   const voice = createVoiceService();
-  await voice.speak(readText());
+  if (await voice.speak(readText()) === 'busy') {
+    console.error('agentic-voice: another session is speaking; not spoken');
+    process.exitCode = 75; // EX_TEMPFAIL: callers may retry later.
+  }
 }
 
 main().catch((error: unknown) => {
