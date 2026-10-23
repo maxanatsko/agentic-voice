@@ -150,7 +150,27 @@ test('refuses a codex table defined outside the managed block, however it is wri
       header,
     );
   }
+  for (const header of ['[mcp_servers]\nagentic-voice = { command = "node" }', '[mcp_servers]\n"agentic-voice".command = "node"']) {
+    assert.throws(
+      () => upsertTomlBlock(`${header}\n`, 'config.toml', 'mcp_servers.agentic-voice', 'command = "x"\n'),
+      /already defines agentic-voice/,
+      header,
+    );
+  }
 });
+
+test('accepts agentic-voice keys outside mcp_servers, such as a Codex plugin marketplace', () => {
+  const codex = [
+    '[marketplaces.agentic-voice]', 'source = "/Users/me/agentic-voice"', '',
+    '[plugins."agentic-voice@agentic-voice"]', 'enabled = true', '',
+    '[mcp_servers.other]', 'command = "other"', 'agentic-voice = "not a server"', '',
+  ].join('\n');
+  assert.match(
+    upsertTomlBlock(codex, 'config.toml', 'mcp_servers.agentic-voice', 'command = "x"\n'),
+    /\[mcp_servers\.agentic-voice\]\ncommand = "x"\n/,
+  );
+});
+
 
 test('keeps other commands that share a hook group with ours', async () => {
   const f = await fixture();
