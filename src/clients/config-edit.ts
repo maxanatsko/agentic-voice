@@ -89,13 +89,38 @@ export function removeHook(text: string, path: string, event: string): string {
   if (isDeepStrictEqual(kept, groups)) return text;
   const hooks = isObject(root.hooks) ? root.hooks : {};
   const { [event]: _removed, ...otherEvents } = hooks;
-  return render({ ...root, hooks: kept.length ? { ...otherEvents, [event]: kept } : otherEvents });
+  const remaining = kept.length ? { ...otherEvents, [event]: kept } : otherEvents;
+  const { hooks: _hooks, ...withoutHooks } = root;
+  return render(Object.keys(remaining).length ? { ...root, hooks: remaining } : withoutHooks);
 }
 
-/** True when a line defines the key as a table header, dotted key or inline-table key, however quoted. */
-function definesTomlKey(line: string, key: string): boolean {
-  const code = line.replace(/#.*$/, '');
-  return new RegExp(`(^|[\\s.{,\\[])["']?${key}["']?\\s*[.=\\]]`).test(code);
+/** A dotted TOML key without spacing or quotes: ` a . "b" ` → ['a', 'b']. */
+function keyPath(key: string): string[] {
+  return key.split('.').map((part) => part.trim().replace(/^(["'])(.*)\1$/, '$2'));
+}
+
+/**
+ * True when the text defines the table as a header, dotted key or inline-table key, however quoted.
+ * Tracks the current table so a same-named key elsewhere (such as [marketplaces.agentic-voice]) is not a match.
+ */
+function definesTomlTable(text: string, table: string): boolean {
+  const target = keyPath(table);
+  let current: string[] = [];
+  for (const line of text.split('\n')) {
+    const code = line.replace(/#.*$/, '').trim();
+    const header = /^\[\[?([^[\]]+)\]\]?$/.exec(code);
+    const assignment = /^([^=]+)=(.*)$/.exec(code);
+    let path: string[];
+    let value = '';
+    if (header) path = current = keyPath(header[1]!);
+    else if (assignment) [path, value] = [[...current, ...keyPath(assignment[1]!)], assignment[2]!];
+    else continue;
+    if (target.every((part, index) => path[index] === part)) return true;
+    // An inline table one level up, such as mcp_servers = { agentic-voice = { … } }.
+    if (path.length === target.length - 1 && path.every((part, index) => target[index] === part) &&
+      new RegExp(`[{,]\\s*["']?${target.at(-1)}["']?\\s*[.=]`).test(value)) return true;
+  }
+  return false;
 }
 
 function tomlBlockRange(text: string): [number, number] | undefined {
@@ -119,7 +144,7 @@ export function tomlBlock(table: string, body: string): string {
 export function upsertTomlBlock(text: string, path: string, table: string, body: string): string {
   const stripped = removeTomlBlock(text);
   const key = table.split('.').at(-1)!;
-  if (stripped.split('\n').some((line) => definesTomlKey(line, key))) {
+  if (definesTomlTable(stripped, table)) {
     throw new Error(`${path} already defines ${key} outside the agentic-voice block (for example [${table}]); remove it, then install again.`);
   }
   const base = stripped.trimEnd();
