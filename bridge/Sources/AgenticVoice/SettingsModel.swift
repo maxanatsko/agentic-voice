@@ -50,25 +50,30 @@ final class SettingsModel: ObservableObject {
 
     func select(voice: String) {
         guard voice != settings.voice else { return }
-        var next = settings
-        next.voice = voice
-        save(next)
+        save { $0.voice = voice }
     }
 
     func set(speed: Double) {
         let rounded = (speed * 100).rounded() / 100
         guard rounded != settings.speed else { return }
-        var next = settings
-        next.speed = rounded
-        save(next)
+        save { $0.speed = rounded }
     }
 
     /// Publishes the change only once it's on disk, so the window never shows a value agents don't use.
-    private func save(_ next: AppSettings) {
-        if let unreadableSettings {
-            message = "Not saved, so the existing file isn't replaced. \(unreadableSettings)"
-            return
+    private func save(_ change: (inout AppSettings) -> Void) {
+        if unreadableSettings != nil {
+            // The user may have fixed or deleted the file since; apply the change to what's there now.
+            do {
+                settings = try AppSettings.load()
+                unreadableSettings = nil
+            } catch {
+                unreadableSettings = error.localizedDescription
+                message = "Not saved, so the existing file isn't replaced. \(error.localizedDescription)"
+                return
+            }
         }
+        var next = settings
+        change(&next)
         do {
             try next.save()
             settings = next
