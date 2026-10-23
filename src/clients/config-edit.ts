@@ -47,9 +47,10 @@ export function removeJsonEntry(text: string, path: string, container: string, n
   return render({ ...root, [container]: rest });
 }
 
-/** Ours is the hook whose command runs speak-notify.sh. */
+/** Ours is a hook in the shape the installer writes: AGENTIC_VOICE_NODE=… …/hooks/speak-notify.sh. */
 function isOurHook(hook: unknown): boolean {
-  return isObject(hook) && typeof hook.command === 'string' && hook.command.includes('speak-notify.sh');
+  return isObject(hook) && typeof hook.command === 'string' &&
+    hook.command.startsWith('AGENTIC_VOICE_NODE=') && hook.command.includes('/hooks/speak-notify.sh');
 }
 
 function hookGroups(root: JsonObject, event: string): unknown[] {
@@ -91,10 +92,10 @@ export function removeHook(text: string, path: string, event: string): string {
   return render({ ...root, hooks: kept.length ? { ...otherEvents, [event]: kept } : otherEvents });
 }
 
-/** Normalizes a TOML table header line to its dotted key, so quoting, spacing and comments compare equal. */
-function tomlTableName(line: string): string | undefined {
-  const header = /^\s*\[([^\[\]]+)\]\s*(#.*)?$/.exec(line);
-  return header?.[1]!.split('.').map((part) => part.trim().replace(/^(["'])(.*)\1$/, '$2')).join('.');
+/** True when a line defines the key as a table header, dotted key or inline-table key, however quoted. */
+function definesTomlKey(line: string, key: string): boolean {
+  const code = line.replace(/#.*$/, '');
+  return new RegExp(`(^|[\\s.{,\\[])["']?${key}["']?\\s*[.=\\]]`).test(code);
 }
 
 function tomlBlockRange(text: string): [number, number] | undefined {
@@ -117,8 +118,9 @@ export function tomlBlock(table: string, body: string): string {
 /** Appends a managed block; a table at the end of a TOML file is always valid. */
 export function upsertTomlBlock(text: string, path: string, table: string, body: string): string {
   const stripped = removeTomlBlock(text);
-  if (stripped.split('\n').some((line) => tomlTableName(line) === table)) {
-    throw new Error(`${path} already defines [${table}] outside the agentic-voice block; remove it, then install again.`);
+  const key = table.split('.').at(-1)!;
+  if (stripped.split('\n').some((line) => definesTomlKey(line, key))) {
+    throw new Error(`${path} already defines ${key} outside the agentic-voice block (for example [${table}]); remove it, then install again.`);
   }
   const base = stripped.trimEnd();
   return `${base ? `${base}\n\n` : ''}${tomlBlock(table, body)}\n`;

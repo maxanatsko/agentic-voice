@@ -140,10 +140,13 @@ test('uninstalling removes only agentic-voice entries', async () => {
 });
 
 test('refuses a codex table defined outside the managed block, however it is written', () => {
-  for (const header of ['[mcp_servers.agentic-voice]', '[mcp_servers."agentic-voice"] # mine', "[ mcp_servers . 'agentic-voice' ]"]) {
+  for (const header of [
+    '[mcp_servers.agentic-voice]', '[mcp_servers."agentic-voice"] # mine', "[ mcp_servers . 'agentic-voice' ]",
+    'mcp_servers.agentic-voice.command = "node"', 'mcp_servers = { agentic-voice = { command = "node" } }',
+  ]) {
     assert.throws(
       () => upsertTomlBlock(`${header}\ncommand = "node"\n`, 'config.toml', 'mcp_servers.agentic-voice', 'command = "x"\n'),
-      /already defines \[mcp_servers\.agentic-voice\]/,
+      /already defines agentic-voice/,
       header,
     );
   }
@@ -153,17 +156,19 @@ test('keeps other commands that share a hook group with ours', async () => {
   const f = await fixture();
   try {
     const shared = { hooks: { Notification: [{ hooks: [
-      { type: 'command', command: '/old/hooks/speak-notify.sh input' },
+      { type: 'command', command: "AGENTIC_VOICE_NODE='/old/node' '/old/hooks/speak-notify.sh' input" },
+      { type: 'command', command: '/Users/me/bin/speak-notify.sh' },
       { type: 'command', command: 'say hi' },
     ] }] } };
     await f.put('.claude/settings.json', JSON.stringify(shared));
     await installClient(f.context, 'claude-code');
     const groups = (await f.json('.claude/settings.json')).hooks.Notification;
-    assert.deepEqual(groups[0].hooks, [{ type: 'command', command: 'say hi' }]);
+    const theirs = [{ type: 'command', command: '/Users/me/bin/speak-notify.sh' }, { type: 'command', command: 'say hi' }];
+    assert.deepEqual(groups[0].hooks, theirs);
     assert.match(groups[1].hooks[0].command, /AGENTIC_VOICE_NODE=/);
 
     await uninstallClient(f.context, 'claude-code');
-    assert.deepEqual((await f.json('.claude/settings.json')).hooks.Notification, [{ hooks: [{ type: 'command', command: 'say hi' }] }]);
+    assert.deepEqual((await f.json('.claude/settings.json')).hooks.Notification, [{ hooks: theirs }]);
   } finally {
     await f.dispose();
   }
@@ -203,6 +208,18 @@ test('warns when the agentic-voice Claude Code plugin is also enabled', async ()
   try {
     await f.put('.claude/settings.json', JSON.stringify({ enabledPlugins: { 'agentic-voice@agentic-voice': true } }));
     assert.match((await status(f.context, 'claude-code')).note ?? '', /plugin is also enabled/);
+  } finally {
+    await f.dispose();
+  }
+});
+
+test('leaves an opencode plugin it did not write alone', async () => {
+  const f = await fixture();
+  try {
+    await f.put('.config/opencode/plugins/agentic-voice.js', 'export const mine = 1;\n');
+    await assert.rejects(installClient(f.context, 'opencode'), /not written by Agentic Voice/);
+    await uninstallClient(f.context, 'opencode');
+    assert.equal(await f.read('.config/opencode/plugins/agentic-voice.js'), 'export const mine = 1;\n');
   } finally {
     await f.dispose();
   }

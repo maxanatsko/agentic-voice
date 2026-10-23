@@ -10,6 +10,7 @@ import {
 } from './config-edit.js';
 
 const NAME = 'agentic-voice';
+const MANAGED_PLUGIN = '// Managed by Agentic Voice: speaks when opencode finishes or needs your input.';
 
 /** Where the installer runs from: the home directory, an absolute node, and the plugin root. */
 export type InstallContext = { home: string; node: string; root: string };
@@ -89,7 +90,7 @@ function clients({ home, node, root }: InstallContext): Client[] {
         },
         {
           kind: 'file', file: join(opencodeDir, `plugins/${NAME}.js`),
-          content: `// Managed by Agentic Voice: speaks when opencode finishes or needs your input.\n` +
+          content: `${MANAGED_PLUGIN}\n` +
             `process.env.AGENTIC_VOICE_NODE = ${JSON.stringify(node)};\n` +
             `export * from ${JSON.stringify(pathToFileURL(join(root, 'opencode/plugin.mjs')).href)};\n`,
         },
@@ -170,6 +171,9 @@ async function install(part: Part): Promise<void> {
     case 'toml':
       return write(part.file, upsertTomlBlock(text ?? '', part.file, part.table, part.body), text);
     case 'file':
+      if (text !== undefined && !text.startsWith(MANAGED_PLUGIN)) {
+        throw new Error(`${part.file} exists and was not written by Agentic Voice; move it aside, then install again.`);
+      }
       return write(part.file, part.content, text);
   }
 }
@@ -188,7 +192,7 @@ async function uninstall(part: Part): Promise<void> {
     case 'toml':
       return write(part.file, removeTomlBlock(text), text);
     case 'file':
-      return unlink(part.file);
+      return text.startsWith(MANAGED_PLUGIN) ? unlink(part.file) : undefined;
   }
 }
 
