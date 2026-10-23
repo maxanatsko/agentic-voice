@@ -40,7 +40,7 @@ final class BridgeHost: ObservableObject {
         task = Task { await run() }
     }
 
-    /// Stops serving; any agentic-voice process that was using this bridge will start its own.
+    /// Stops serving. MCP servers that were using this bridge can't speak until they restart.
     func stop() async {
         task?.cancel()
         task = nil
