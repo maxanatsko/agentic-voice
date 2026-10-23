@@ -83,8 +83,8 @@ final class BridgeHost: ObservableObject {
 
     private func serve() async throws {
         state = .preparing("Preparing the voice model…", fraction: nil)
-        let manager = try await BridgeServer.prepare(defaultVoice: VoiceCatalog.defaultVoice) { progress in
-            Task { @MainActor [weak self] in self?.show(progress) }
+        let manager = try await BridgeServer.prepare(defaultVoice: VoiceCatalog.defaultVoice) { [weak self] progress in
+            Task { @MainActor in self?.show(progress) }
         }
         let app = try await BridgeServer.makeApplication(manager: manager)
         try await app.startup()
