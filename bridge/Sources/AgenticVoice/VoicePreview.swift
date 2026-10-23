@@ -26,7 +26,10 @@ enum VoicePreview {
         switch result.status {
         case 0: return
         case 75: throw VoicePreviewError.busy  // EX_TEMPFAIL from src/cli.ts
-        default: throw VoicePreviewError.failed(result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))
+        default:
+            let stderr = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            // A timeout or signal kills the CLI before it can explain itself.
+            throw VoicePreviewError.failed(stderr.isEmpty ? "The preview stopped without an error (exit status \(result.status)); try again." : stderr)
         }
     }
 }
