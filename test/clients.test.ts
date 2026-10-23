@@ -249,6 +249,8 @@ test('leaves an opencode plugin it did not write alone', async () => {
   try {
     await f.put('.config/opencode/plugins/agentic-voice.js', 'export const mine = 1;\n');
     await assert.rejects(installClient(f.context, 'opencode'), /not written by Agentic Voice/);
+    assert.equal(existsSync(f.file('.config/opencode/opencode.json')), false, 'no MCP entry from a refused install');
+    assert.equal((await status(f.context, 'opencode')).installed, false);
     await uninstallClient(f.context, 'opencode');
     assert.equal(await f.read('.config/opencode/plugins/agentic-voice.js'), 'export const mine = 1;\n');
   } finally {
