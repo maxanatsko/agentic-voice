@@ -23,8 +23,8 @@ enum ClientInstallerError: Error, LocalizedError {
 
 /// Runs the bundled Node installer, which owns all client config editing.
 enum ClientInstaller {
-    static func run(_ command: String, clients: [String] = [], node: NodeInstall, path: String) throws -> [ClientStatus] {
-        let result = try BundledNode.run("install-clients.js", [command] + clients, node: node, path: path)
+    static func run(_ command: String, clients: [String] = [], path: String) throws -> [ClientStatus] {
+        let result = try BundledNode.run("install-clients.js", [command] + clients, path: path)
         // Per-client failures still print every status (with an error) and exit 1.
         if let statuses = try? JSONDecoder().decode([ClientStatus].self, from: Data(result.stdout.utf8)) {
             return statuses
