@@ -19,7 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "bridge:build": "swift build --package-path bridge",
     "bridge:start": "swift run --package-path bridge TTSBridge",
-    "setup": "npm install && npm run build && npm run bridge:build"
+    "setup": "npm install && npm run build && npm run bridge:build",
+    "clients": "node dist/src/install-clients.js"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
