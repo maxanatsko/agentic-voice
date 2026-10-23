@@ -129,7 +129,13 @@ printf '%s' "The task finished successfully." | npm run speak
 npm run app:build   # → build/Agentic Voice.app (ad-hoc signed, not notarized)
 ```
 
-Move it to `/Applications` and open it. On first run it downloads the model and the default voice, showing progress in the menu. It follows the same rules as MCP's bridge management: if a healthy bridge is already running it uses that one and takes over when it goes away, and it takes the `127.0.0.1:19000` startup lock so only one process loads the model. The menu offers Launch at Login and Quit. Quitting stops the engine; an MCP server that was using it starts its own on the next `speak`.
+Move it to `/Applications` and open it. On first run it downloads the model and the default voice, showing progress in the menu. It follows the same rules as MCP's bridge management: if a healthy bridge is already running it uses that one and takes over when it goes away, and it takes the `127.0.0.1:19000` startup lock so only one process loads the model. The menu offers Settings, Launch at Login and Quit. Quitting stops the engine; an MCP server that was using it starts its own on the next `speak`.
+
+Settings has three tabs:
+
+- **General**: the default voice and speed, saved to the shared settings file and applied on every agent's next spoken message. Also shows the voice engine's status and which Node 26+ binary the app found, with a way to choose one by hand.
+- **Voices**: install, preview or delete any of the 28 English voices. Preview takes the same speaking lock as agents, so it never talks over them.
+- **Clients**: install, update or uninstall agentic-voice in each client by running the bundled `install-clients` (see below) with the found Node binary and your login shell's `PATH`.
 
 ## Install into clients
 

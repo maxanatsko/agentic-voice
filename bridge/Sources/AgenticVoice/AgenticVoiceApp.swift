@@ -32,6 +32,8 @@ struct MenuContent: View {
             Text(loginItemError)
         }
         Divider()
+        Button("Settings…") { SettingsWindow.show(host: host) }
+            .keyboardShortcut(",")
         Toggle("Launch at Login", isOn: $launchAtLogin)
             .onChange(of: launchAtLogin) { _, enabled in
                 do {
