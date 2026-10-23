@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -139,11 +139,48 @@ test('uninstalling removes only agentic-voice entries', async () => {
   }
 });
 
-test('refuses a codex table defined outside the managed block', () => {
-  assert.throws(
-    () => upsertTomlBlock('[mcp_servers.agentic-voice]\ncommand = "node"\n', 'config.toml', 'mcp_servers.agentic-voice', 'command = "x"\n'),
-    /already defines \[mcp_servers\.agentic-voice\]/,
-  );
+test('refuses a codex table defined outside the managed block, however it is written', () => {
+  for (const header of ['[mcp_servers.agentic-voice]', '[mcp_servers."agentic-voice"] # mine', "[ mcp_servers . 'agentic-voice' ]"]) {
+    assert.throws(
+      () => upsertTomlBlock(`${header}\ncommand = "node"\n`, 'config.toml', 'mcp_servers.agentic-voice', 'command = "x"\n'),
+      /already defines \[mcp_servers\.agentic-voice\]/,
+      header,
+    );
+  }
+});
+
+test('keeps other commands that share a hook group with ours', async () => {
+  const f = await fixture();
+  try {
+    const shared = { hooks: { Notification: [{ hooks: [
+      { type: 'command', command: '/old/hooks/speak-notify.sh input' },
+      { type: 'command', command: 'say hi' },
+    ] }] } };
+    await f.put('.claude/settings.json', JSON.stringify(shared));
+    await installClient(f.context, 'claude-code');
+    const groups = (await f.json('.claude/settings.json')).hooks.Notification;
+    assert.deepEqual(groups[0].hooks, [{ type: 'command', command: 'say hi' }]);
+    assert.match(groups[1].hooks[0].command, /AGENTIC_VOICE_NODE=/);
+
+    await uninstallClient(f.context, 'claude-code');
+    assert.deepEqual((await f.json('.claude/settings.json')).hooks.Notification, [{ hooks: [{ type: 'command', command: 'say hi' }] }]);
+  } finally {
+    await f.dispose();
+  }
+});
+
+test('keeps the permissions of a replaced config file', async () => {
+  const f = await fixture();
+  try {
+    await f.put('.codex/config.toml', 'model = "gpt"\n');
+    await chmod(f.file('.codex/config.toml'), 0o600);
+    await installClient(f.context, 'codex');
+    assert.equal((await stat(f.file('.codex/config.toml'))).mode & 0o777, 0o600);
+    await uninstallClient(f.context, 'codex');
+    assert.equal((await stat(f.file('.codex/config.toml'))).mode & 0o777, 0o600);
+  } finally {
+    await f.dispose();
+  }
 });
 
 test('leaves a config with comments unchanged and shows the entry to add', async () => {

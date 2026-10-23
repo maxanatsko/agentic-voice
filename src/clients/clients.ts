@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -107,14 +107,15 @@ async function read(file: string): Promise<string | undefined> {
   }
 }
 
-/** Backs up the original once, then replaces the file atomically. */
+/** Backs up the original once, then replaces the file atomically, keeping its permissions. */
 async function write(file: string, next: string, previous: string | undefined): Promise<void> {
   if (next === previous) return;
   await mkdir(dirname(file), { recursive: true });
   const backup = `${file}.${NAME}-backup`;
   if (previous !== undefined && !existsSync(backup)) await copyFile(file, backup);
   const temporary = `${file}.${NAME}-tmp`;
-  await writeFile(temporary, next);
+  await writeFile(temporary, next, { mode: 0o600 });
+  if (previous !== undefined) await chmod(temporary, (await stat(file)).mode & 0o777);
   await rename(temporary, file);
 }
 
