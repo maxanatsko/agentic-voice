@@ -27,32 +27,34 @@ enum NodeLocatorError: Error, LocalizedError {
 /// shell for it and also checks the usual install locations.
 enum NodeLocator {
     static let minimumMajor = 26
-    private static let overrideKey = "nodePath"
+    private static let pathMarker = "__AGENTIC_VOICE_PATH__="
 
-    /// A node binary the user chose by hand, tried before searching.
-    static var chosenPath: String? {
-        get { UserDefaults.standard.string(forKey: overrideKey) }
-        set { UserDefaults.standard.set(newValue, forKey: overrideKey) }
-    }
+    /// A node binary the user chose by hand, tried before searching. Kept for this run only:
+    /// the shared settings file is the app's only persisted setting.
+    @MainActor static var chosenPath: String?
 
-    /// The login shell's PATH, also used for the installer so it can find `claude`.
+    /// The login shell's PATH, also used for the installer so it can find `claude`. Read from a
+    /// marked line, because shell profiles may print banners of their own.
     static func loginShellPath() -> String {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        if let result = try? Shell.run(shell, ["-l", "-c", "printf %s \"$PATH\""], timeout: 5),
-           result.status == 0, !result.stdout.isEmpty {
-            return result.stdout
+        if let result = try? Shell.run(shell, ["-l", "-c", "printf '\\n%s%s\\n' '\(pathMarker)' \"$PATH\""], timeout: 5),
+           result.status == 0,
+           let line = result.stdout.split(separator: "\n").last(where: { $0.hasPrefix(pathMarker) }),
+           line.count > pathMarker.count {
+            return String(line.dropFirst(pathMarker.count))
         }
         return ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
     }
 
-    static func locate() throws -> NodeInstall {
-        if let chosen = chosenPath {
+    /// `chosen` is a binary picked by hand; `path` is the login shell's PATH to search otherwise.
+    static func locate(chosen: String?, path: String) throws -> NodeInstall {
+        if let chosen {
             guard let install = inspect(chosen), isSupported(install) else { throw NodeLocatorError.unusable(chosen) }
             return install
         }
         var found: [NodeInstall] = []
-        for path in candidates() where !found.contains(where: { $0.path == path }) {
-            guard let install = inspect(path) else { continue }
+        for candidate in candidates(path: path) where !found.contains(where: { $0.path == candidate }) {
+            guard let install = inspect(candidate) else { continue }
             if isSupported(install) { return install }
             found.append(install)
         }
@@ -71,9 +73,9 @@ enum NodeLocator {
         (install.version.split(separator: ".").first.flatMap { Int($0) } ?? 0) >= minimumMajor
     }
 
-    private static func candidates() -> [String] {
+    private static func candidates(path: String) -> [String] {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        var directories = loginShellPath().split(separator: ":").map(String.init)
+        var directories = path.split(separator: ":").map(String.init)
         directories += ["/opt/homebrew/bin", "/usr/local/bin", "\(home)/.volta/bin"]
         let nvm = "\(home)/.nvm/versions/node"
         let versions = (try? FileManager.default.contentsOfDirectory(atPath: nvm)) ?? []

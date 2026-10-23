@@ -15,6 +15,24 @@ struct AppSettings: Codable, Equatable {
     var voice: String?
     var speed: Double?
 
+    init(voice: String? = nil, speed: Double? = nil) {
+        self.voice = voice
+        self.speed = speed
+    }
+
+    /// Like readSettings() in src/config.ts: a present key must hold a value (null is invalid),
+    /// and the voice is trimmed.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        for key in [CodingKeys.voice, .speed] where container.contains(key) {
+            if try container.decodeNil(forKey: key) {
+                throw AppSettingsError.invalid("\"\(key.stringValue)\" must not be null")
+            }
+        }
+        voice = try container.decodeIfPresent(String.self, forKey: .voice)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        speed = try container.decodeIfPresent(Double.self, forKey: .speed)
+    }
+
     static var url: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/AgenticVoice/config.json")
@@ -27,10 +45,12 @@ struct AppSettings: Codable, Equatable {
         let settings: AppSettings
         do {
             settings = try JSONDecoder().decode(AppSettings.self, from: Data(contentsOf: url))
+        } catch let error as AppSettingsError {
+            throw error
         } catch {
             throw AppSettingsError.invalid("is not valid JSON with a string voice and numeric speed")
         }
-        if let voice = settings.voice, voice.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if let voice = settings.voice, voice.isEmpty {
             throw AppSettingsError.invalid("\"voice\" must be a non-empty string")
         }
         if let speed = settings.speed, !(speed.isFinite && speed > 0) {

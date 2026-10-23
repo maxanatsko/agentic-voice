@@ -7,6 +7,7 @@ final class SettingsModel: ObservableObject {
     @Published var settings = AppSettings()
     @Published private(set) var installedVoices: Set<String> = []
     @Published private(set) var busyVoices: Set<String> = []
+    @Published private(set) var previewing = false
     @Published private(set) var node: Result<NodeInstall, Error>?
     @Published private(set) var clients: [ClientStatus] = []
     @Published private(set) var busyClients = false
@@ -14,6 +15,8 @@ final class SettingsModel: ObservableObject {
 
     let host: BridgeHost
     private var shellPath: String?
+    /// Set when the settings file exists but can't be read; saving then would replace it.
+    private var unreadableSettings: String?
 
     init(host: BridgeHost) {
         self.host = host
@@ -22,6 +25,11 @@ final class SettingsModel: ObservableObject {
     var selectedVoice: String { settings.voice ?? VoiceCatalog.defaultVoice }
     var speed: Double { settings.speed ?? 1.0 }
 
+    var nodeReady: Bool {
+        if case .success = node { return true }
+        return false
+    }
+
     var engineReady: Bool {
         host.state == .running || host.state == .external
     }
@@ -29,8 +37,10 @@ final class SettingsModel: ObservableObject {
     func load() async {
         do {
             settings = try AppSettings.load()
+            unreadableSettings = nil
         } catch {
-            message = "Couldn't read \(AppSettings.url.path): \(error.localizedDescription)"
+            unreadableSettings = error.localizedDescription
+            message = error.localizedDescription
         }
         refreshVoices()
         await locateNode()
@@ -39,16 +49,23 @@ final class SettingsModel: ObservableObject {
     // MARK: Settings
 
     func select(voice: String) {
+        guard voice != settings.voice else { return }
         settings.voice = voice
         save()
     }
 
     func set(speed: Double) {
-        settings.speed = (speed * 100).rounded() / 100
+        let rounded = (speed * 100).rounded() / 100
+        guard rounded != settings.speed else { return }
+        settings.speed = rounded
         save()
     }
 
     private func save() {
+        if let unreadableSettings {
+            message = "Not saved, so the existing file isn't replaced. \(unreadableSettings)"
+            return
+        }
         do {
             try settings.save()
         } catch {
@@ -87,8 +104,13 @@ final class SettingsModel: ObservableObject {
             message = "Previews need Node \(NodeLocator.minimumMajor)+; set it up in General."
             return
         }
+        // One preview at a time: a second would hit the speaking lock and look like another session.
+        previewing = true
         busyVoices.insert(voice.id)
-        defer { busyVoices.remove(voice.id) }
+        defer {
+            previewing = false
+            busyVoices.remove(voice.id)
+        }
         let speed = speed
         let result = await Task.detached {
             Result { try VoicePreview.play(voice, speed: speed, node: node, path: path) }
@@ -101,8 +123,10 @@ final class SettingsModel: ObservableObject {
     // MARK: Node and clients
 
     func locateNode() async {
+        let chosen = NodeLocator.chosenPath
         let located = await Task.detached { () -> (Result<NodeInstall, Error>, String) in
-            (Result { try NodeLocator.locate() }, NodeLocator.loginShellPath())
+            let path = NodeLocator.loginShellPath()
+            return (Result { try NodeLocator.locate(chosen: chosen, path: path) }, path)
         }.value
         node = located.0
         shellPath = located.1
@@ -128,7 +152,12 @@ final class SettingsModel: ObservableObject {
     func uninstall(client: ClientStatus) async { await runInstaller("uninstall", [client.id]) }
 
     private func runInstaller(_ command: String, _ ids: [String] = []) async {
-        guard case .success(let node) = node, let path = shellPath else { return }
+        guard case .success(let node) = node, let path = shellPath else {
+            if command != "status" {
+                message = "Installing into clients needs Node \(NodeLocator.minimumMajor)+; set it up in General."
+            }
+            return
+        }
         busyClients = true
         defer { busyClients = false }
         let result = await Task.detached {

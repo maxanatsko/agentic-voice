@@ -10,7 +10,7 @@ enum SettingsWindow {
 
     static func show(host: BridgeHost) {
         if window == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: SettingsModel(host: host))))
+            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: SettingsModel(host: host), host: host)))
             window.title = "Agentic Voice Settings"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.isReleasedWhenClosed = false
@@ -25,6 +25,7 @@ enum SettingsWindow {
 
 struct SettingsView: View {
     @StateObject var model: SettingsModel
+    @ObservedObject var host: BridgeHost
 
     var body: some View {
         TabView {
@@ -35,6 +36,10 @@ struct SettingsView: View {
         .padding()
         .frame(minWidth: 520, minHeight: 460)
         .task { await model.load() }
+        // First-run preparation installs the default voice; pick it up once the engine is ready.
+        .onChange(of: model.engineReady) { _, ready in
+            if ready { model.refreshVoices() }
+        }
         .alert("Agentic Voice", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
             Button("OK") { model.message = nil }
         } message: {
@@ -58,9 +63,7 @@ struct GeneralTab: View {
                 }
                 LabeledContent("Speed") {
                     HStack {
-                        Slider(value: $speed, in: 0.5...2.0, step: 0.05, onEditingChanged: { editing in
-                            if !editing { model.set(speed: speed) }
-                        })
+                        Slider(value: $speed, in: 0.5...2.0, step: 0.05)
                         Text(String(format: "%.2f×", speed)).monospacedDigit().frame(width: 52, alignment: .trailing)
                     }
                 }
@@ -92,8 +95,7 @@ struct GeneralTab: View {
         }
         .formStyle(.grouped)
         .onAppear { speed = model.speed }
-        // First-run preparation installs the default voice; pick it up once the engine is ready.
-        .onChange(of: host.state) { _, _ in model.refreshVoices() }
+        .onChange(of: speed) { _, speed in model.set(speed: speed) }
         .onChange(of: model.settings) { _, settings in speed = settings.speed ?? 1.0 }
     }
 }
@@ -114,7 +116,7 @@ struct VoicesTab: View {
                     ProgressView().controlSize(.small)
                 } else if model.installedVoices.contains(voice.id) {
                     Button("Preview") { Task { await model.play(voice) } }
-                        .disabled(!model.engineReady || model.busyVoices.contains(voice.id))
+                        .disabled(!model.engineReady || model.previewing)
                     Button("Delete") { model.remove(voice) }
                         .disabled(voice.id == model.selectedVoice)
                 } else {
@@ -123,7 +125,6 @@ struct VoicesTab: View {
             }
         }
         .onAppear { model.refreshVoices() }
-        .onChange(of: host.state) { _, _ in model.refreshVoices() }
         .safeAreaInset(edge: .bottom) {
             Text("Voices download from hexgrad/Kokoro-82M (about 0.5 MB each).")
                 .font(.caption).foregroundStyle(.secondary)
@@ -160,7 +161,7 @@ struct ClientsTab: View {
                         Button("Install") { Task { await model.install(client: client) } }
                     }
                 }
-                .disabled(model.busyClients)
+                .disabled(model.busyClients || !model.nodeReady)
             }
             Text("Restart a client after installing or uninstalling. Original config files are backed up once as <file>.agentic-voice-backup.")
                 .font(.caption).foregroundStyle(.secondary)
