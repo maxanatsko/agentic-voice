@@ -95,7 +95,11 @@ struct GeneralTab: View {
         }
         .formStyle(.grouped)
         .onAppear { speed = model.speed }
-        .onChange(of: speed) { _, speed in model.set(speed: speed) }
+        .onChange(of: speed) { _, speed in
+            model.set(speed: speed)
+            // A failed save leaves the setting unchanged; show that rather than the attempt.
+            if model.settings.speed ?? 1.0 != (speed * 100).rounded() / 100 { self.speed = model.speed }
+        }
         .onChange(of: model.settings) { _, settings in speed = settings.speed ?? 1.0 }
     }
 }

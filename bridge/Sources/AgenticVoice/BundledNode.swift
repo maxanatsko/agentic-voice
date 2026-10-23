@@ -22,7 +22,10 @@ enum BundledNode {
     static func run(_ script: String, _ arguments: [String], node: NodeInstall, path: String, environment extra: [String: String] = [:]) throws -> Shell.Result {
         guard let root else { throw BundledNodeError.notBundled }
         var environment = ProcessInfo.processInfo.environment.merging(extra) { _, new in new }
-        environment["PATH"] = path
+        // Put the found node's directory first: npm-global tools such as `claude` live beside it,
+        // even when it came from a fallback location the login shell's PATH doesn't include.
+        let nodeDirectory = URL(fileURLWithPath: node.path).deletingLastPathComponent().path
+        environment["PATH"] = "\(nodeDirectory):\(path)"
         let script = root.appendingPathComponent("dist/src/\(script)").path
         return try Shell.run(node.path, [script] + arguments, environment: environment)
     }
