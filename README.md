@@ -94,6 +94,8 @@ When MCP closes or receives SIGINT/SIGTERM, it stops only the child it started. 
 
 MCP instances coordinate startup by exclusively binding `127.0.0.1:19000` before spawning the bridge. This reserved coordination port prevents concurrent model downloads/loading while port 9000 is still closed. The owner holds it until its child exits; other instances wait for readiness and reuse the bridge. The OS releases the coordination socket if its owner exits, with no persistent lock files. Keep port 19000 available; an unrelated listener there causes startup to time out with diagnostics.
 
+Only one session speaks at a time. Whichever agentic-voice process is speaking (MCP, CLI, or hook) holds an exclusive bind on `127.0.0.1:19001` from synthesis through playback; the OS releases it if that process exits. A request that arrives while the speaker is held is not queued: the `speak` tool returns a non-error "another session is speaking" result so the agent can skip or retry later, and the CLI prints the same message to stderr and exits with code 75. Keep port 19001 available.
+
 If the executable is missing, run `npm run setup` explicitly. If startup times out or model initialization fails, run `npm run bridge:start` to inspect diagnostics and finish first-use initialization, then restart MCP. If another service occupies port 9000, free the port or configure `TTS_URL` for your backend.
 
 The CLI and lifecycle hooks do not start the bridge. To try the CLI without an active MCP server, start a backend explicitly:
@@ -132,6 +134,8 @@ The server exposes one tool:
 ```text
 speak({ text, kind? })
 ```
+
+If another session is already speaking, `speak` returns `Not spoken: another agentic-voice session is speaking…` (not an error), and the server's instructions tell the agent to usually skip rather than retry.
 
 `kind` is optional metadata: `question`, `completion`, `alert`, or `custom`. It currently does not change synthesis behavior; keeping it in the contract leaves room for small policy changes without creating separate tools.
 

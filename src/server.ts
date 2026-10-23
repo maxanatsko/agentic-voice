@@ -22,6 +22,7 @@ const instructions = [
   '- When you need input or a decision: speak the question, then also show it as text or through your question tool.',
   '- When you hit a blocker that needs attention.',
   'Write for listening: no code, paths, logs, or long technical output. Do not speak for routine progress.',
+  'If speak reports that another session is speaking, do not retry right away; usually skip it, since your text reply already carries the message.',
 ].join('\n');
 
 function buildServer(voice: VoiceService, ready: Promise<void>, onclose: () => void): McpServer {
@@ -39,9 +40,14 @@ function buildServer(voice: VoiceService, ready: Promise<void>, onclose: () => v
     async ({ text }) => {
       try {
         await ready;
-        await voice.speak(text);
+        const outcome = await voice.speak(text);
         return {
-          content: [{ type: 'text', text: 'Spoken successfully.' }],
+          content: [{
+            type: 'text',
+            text: outcome === 'spoken'
+              ? 'Spoken successfully.'
+              : 'Not spoken: another agentic-voice session is speaking. Your text reply is unaffected; skip, or call speak again later only if it still matters.',
+          }],
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

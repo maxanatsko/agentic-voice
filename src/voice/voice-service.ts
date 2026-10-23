@@ -8,10 +8,19 @@ export class VoiceService {
     private readonly maxChars: number,
   ) {}
 
-  async speak(text: string): Promise<void> {
+  /** Speaks, or returns 'busy' without synthesizing when another session holds the speaker. */
+  async speak(text: string): Promise<'spoken' | 'busy'> {
     const preparedText = prepareSpeechText(text, this.maxChars);
-    const wav = await this.tts.synthesize(preparedText);
-    await this.player.play(wav);
+    const release = await this.player.claim();
+    if (!release) return 'busy';
+    try {
+      // Holding the claim through synthesis keeps another session from cutting in before playback.
+      const wav = await this.tts.synthesize(preparedText);
+      await this.player.play(wav);
+      return 'spoken';
+    } finally {
+      await release();
+    }
   }
 }
 
