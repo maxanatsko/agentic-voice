@@ -34,6 +34,8 @@ struct MenuContent: View {
         Divider()
         Toggle("Launch at Login", isOn: $launchAtLogin)
             .onChange(of: launchAtLogin) { _, enabled in
+                // Resetting the toggle after a failure lands here too; there is nothing to change then.
+                guard enabled != LoginItem.isEnabled else { return }
                 do {
                     try LoginItem.set(enabled)
                     loginItemError = nil
