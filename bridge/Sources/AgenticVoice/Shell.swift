@@ -25,7 +25,15 @@ enum Shell {
         process.standardError = stderr
         try process.run()
 
-        let timer = DispatchWorkItem { if process.isRunning { process.terminate() } }
+        // Ask politely at the deadline, then force it: the reads below block until the child exits.
+        let pid = process.processIdentifier
+        let timer = DispatchWorkItem {
+            guard process.isRunning else { return }
+            process.terminate()
+            DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+                if process.isRunning { kill(pid, SIGKILL) }
+            }
+        }
         DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timer)
         // Drain stderr concurrently, so a chatty child can't block on a full pipe.
         let errorData = Collected()
