@@ -89,7 +89,9 @@ export function removeHook(text: string, path: string, event: string): string {
   if (isDeepStrictEqual(kept, groups)) return text;
   const hooks = isObject(root.hooks) ? root.hooks : {};
   const { [event]: _removed, ...otherEvents } = hooks;
-  return render({ ...root, hooks: kept.length ? { ...otherEvents, [event]: kept } : otherEvents });
+  const remaining = kept.length ? { ...otherEvents, [event]: kept } : otherEvents;
+  const { hooks: _hooks, ...withoutHooks } = root;
+  return render(Object.keys(remaining).length ? { ...root, hooks: remaining } : withoutHooks);
 }
 
 /** A dotted TOML key without spacing or quotes: ` a . "b" ` → ['a', 'b']. */

@@ -171,6 +171,17 @@ test('accepts agentic-voice keys outside mcp_servers, such as a Codex plugin mar
   );
 });
 
+test('uninstalling the only hook leaves no empty hooks object behind', async () => {
+  const f = await fixture();
+  try {
+    await f.put('.claude/settings.json', JSON.stringify({ model: 'opus' }));
+    await installClient(f.context, 'claude-code');
+    await uninstallClient(f.context, 'claude-code');
+    assert.deepEqual(await f.json('.claude/settings.json'), { model: 'opus' });
+  } finally {
+    await f.dispose();
+  }
+});
 
 test('keeps other commands that share a hook group with ours', async () => {
   const f = await fixture();
