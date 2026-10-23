@@ -25,7 +25,7 @@ const instructions = [
   'If speak reports that another session is speaking, do not retry right away; usually skip it, since your text reply already carries the message.',
 ].join('\n');
 
-function buildServer(voice: VoiceService, ready: Promise<void>, onclose: () => void): McpServer {
+function buildServer(voice: () => VoiceService, ready: Promise<void>, onclose: () => void): McpServer {
   const server = new McpServer({ name: 'agentic-voice', version: '0.1.0' }, { instructions });
   server.server.onclose = onclose;
 
@@ -40,7 +40,7 @@ function buildServer(voice: VoiceService, ready: Promise<void>, onclose: () => v
     async ({ text }) => {
       try {
         await ready;
-        const outcome = await voice.speak(text);
+        const outcome = await voice().speak(text);
         return {
           content: [{
             type: 'text',
@@ -67,7 +67,9 @@ function main(): void {
   const local = isBundledTtsUrl(config.ttsUrl);
   // The bundled bridge binds IPv4 only; localhost may resolve to IPv6 first.
   if (local) config.ttsUrl = 'http://127.0.0.1:9000';
-  const voice = createVoiceService(config);
+  // Re-read voice and speed on every call so changes in the settings file apply without a restart.
+  // The endpoint stays fixed: the bridge was resolved and started for it.
+  const voice = (): VoiceService => createVoiceService({ ...loadConfig(), ttsUrl: config.ttsUrl });
   const bridge = local ? new BridgeProcess(config.ttsUrl) : undefined;
   let handle: ReturnType<typeof serveStdio> | undefined;
   let shutdown: Promise<void> | undefined;
