@@ -154,27 +154,38 @@ async function inspect(part: Part): Promise<[boolean, boolean]> {
       return [block !== undefined, block === tomlBlock(part.table, part.body)];
     }
     case 'file':
-      return [true, text === part.content];
+      return [text.startsWith(MANAGED_PLUGIN), text === part.content];
   }
 }
 
-async function install(part: Part): Promise<void> {
+/** Computes a part's edit, throwing if it must be refused, and returns the step that applies it. */
+async function prepareInstall(part: Part): Promise<() => Promise<void>> {
   const text = await read(part.file);
   switch (part.kind) {
-    case 'json':
-      return write(part.file, upsertJsonEntry(text ?? '', part.file, part.container, NAME, part.entry), text);
-    case 'claude-cli':
-      if (text !== undefined && readJsonEntry(text, part.file, 'mcpServers', NAME) !== undefined) claude(['mcp', 'remove', '-s', 'user', NAME]);
-      return claude(['mcp', 'add-json', '-s', 'user', NAME, JSON.stringify({ type: 'stdio', ...part.entry })]);
-    case 'hook':
-      return write(part.file, upsertHook(text ?? '', part.file, part.event, part.command), text);
-    case 'toml':
-      return write(part.file, upsertTomlBlock(text ?? '', part.file, part.table, part.body), text);
+    case 'json': {
+      const next = upsertJsonEntry(text ?? '', part.file, part.container, NAME, part.entry);
+      return () => write(part.file, next, text);
+    }
+    case 'claude-cli': {
+      const replace = text !== undefined && readJsonEntry(text, part.file, 'mcpServers', NAME) !== undefined;
+      return async () => {
+        if (replace) claude(['mcp', 'remove', '-s', 'user', NAME]);
+        claude(['mcp', 'add-json', '-s', 'user', NAME, JSON.stringify({ type: 'stdio', ...part.entry })]);
+      };
+    }
+    case 'hook': {
+      const next = upsertHook(text ?? '', part.file, part.event, part.command);
+      return () => write(part.file, next, text);
+    }
+    case 'toml': {
+      const next = upsertTomlBlock(text ?? '', part.file, part.table, part.body);
+      return () => write(part.file, next, text);
+    }
     case 'file':
       if (text !== undefined && !text.startsWith(MANAGED_PLUGIN)) {
         throw new Error(`${part.file} exists and was not written by Agentic Voice; move it aside, then install again.`);
       }
-      return write(part.file, part.content, text);
+      return () => write(part.file, part.content, text);
   }
 }
 
@@ -232,8 +243,11 @@ export async function status(context: InstallContext, id: ClientId): Promise<Cli
   };
 }
 
+/** Checks every part before writing any, so a refused part leaves the client untouched. */
 export async function installClient(context: InstallContext, id: ClientId): Promise<void> {
-  for (const part of find(context, id).parts) await install(part);
+  const steps = [];
+  for (const part of find(context, id).parts) steps.push(await prepareInstall(part));
+  for (const apply of steps) await apply();
 }
 
 export async function uninstallClient(context: InstallContext, id: ClientId): Promise<void> {
