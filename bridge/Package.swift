@@ -1,22 +1,31 @@
-// swift-tools-version:5.9
+// swift-tools-version:6.2
 import PackageDescription
 
 let package = Package(
     name: "TTSBridge",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v26)
+    ],
+    products: [
+        .executable(name: "TTSBridge", targets: ["TTSBridge"])
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.110.0"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.4.0")
     ],
     targets: [
-        .executableTarget(
-            name: "TTSBridge",
+        // Synthesis server, model preparation and voice installation, shared by the
+        // TTSBridge command-line executable and the Agentic Voice app.
+        .target(
+            name: "TTSBridgeCore",
             dependencies: [
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "FluidAudio", package: "FluidAudio")
             ]
+        ),
+        .executableTarget(
+            name: "TTSBridge",
+            dependencies: ["TTSBridgeCore"]
         )
     ]
 )

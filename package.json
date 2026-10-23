@@ -17,10 +17,11 @@
     "speak": "tsx src/cli.ts",
     "test": "node --import tsx --test test/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "bridge:build": "swift build --package-path bridge",
-    "bridge:start": "swift run --package-path bridge TTSBridge",
+    "bridge:build": "swift build -c release --package-path bridge --product TTSBridge",
+    "bridge:start": "swift run -c release --package-path bridge TTSBridge",
     "setup": "npm install && npm run build && npm run bridge:build",
-    "clients": "node dist/src/install-clients.js"
+    "clients": "node dist/src/install-clients.js",
+    "bridge:voice": "swift run -c release --package-path bridge TTSBridge install-voice"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

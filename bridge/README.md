@@ -20,30 +20,31 @@ npm run bridge:start
 Or directly:
 
 ```bash
-swift build --package-path bridge
-swift run --package-path bridge TTSBridge
+swift build -c release --package-path bridge --product TTSBridge
+swift run -c release --package-path bridge TTSBridge
 ```
+
+The package has two parts: the `TTSBridgeCore` library (HTTP routes, model preparation and voice installation, in `Sources/TTSBridgeCore/`) and the thin `TTSBridge` executable that runs it. The Agentic Voice macOS app uses the same library, so there is one implementation of each.
 
 First run downloads the model from HuggingFace (roughly a minute) and caches it outside this repo at `~/.cache/fluidaudio/Models/` — that cache is FluidAudio's own convention, not something this repo controls.
 
-Later runs load cached assets; they do not reinstall or rebuild anything. HTTP starts only after `manager.initialize` completes. The documented `GET /v1/audio/health` endpoint returns HTTP 200 and JSON `{"status":"ready"}` once synthesis is available; `/` is only a welcome page. MCP waits up to five minutes; if first-use downloads take longer, complete initialization manually and restart MCP. MCP startup coordination reserves `127.0.0.1:19000` to prevent multiple bridge children from initializing concurrently.
+Before loading, the bridge also installs the default voice if it is missing (FluidAudio's own repository hosts only `af_heart`). Later runs load cached assets; they do not reinstall or rebuild anything. HTTP starts only after `manager.initialize` completes. The documented `GET /v1/audio/health` endpoint returns HTTP 200 and JSON `{"status":"ready"}` once synthesis is available; `/` is only a welcome page. MCP waits up to five minutes; if first-use downloads take longer, complete initialization manually and restart MCP. MCP startup coordination reserves `127.0.0.1:19000` to prevent multiple bridge children from initializing concurrently.
 
-The server listens on `127.0.0.1:9000` and preloads one voice at startup (`am_michael`, set in `Sources/TTSBridge/main.swift`).
+The server listens on `127.0.0.1:9000` and preloads one voice at startup (`am_michael`, `VoiceCatalog.defaultVoice` in `Sources/TTSBridgeCore/VoiceCatalog.swift`). A request for a voice that isn't installed gets HTTP 400 naming the voice.
 
 ## Voice roster
 
 Kokoro-82M ships 54 official voices, but this backend's English text frontend (Misaki lexicon + BART G2P) only pairs correctly with the ~20 US/UK English ones — prefixes `af_`/`am_` (US female/male) and `bf_`/`bm_` (UK female/male). The other prefixes (`zf_`/`zm_` Mandarin, `jf_`/`jm_` Japanese, etc.) are different languages and won't sound right read as English text.
 
-Converted on this machine so far: `af_heart`, `af_bella`, `af_nicole`, `af_sarah`, `bf_emma`, `bm_george`, `am_adam`, `am_echo`, `am_eric`, `am_fenrir`, `am_liam`, `am_michael`, `am_onyx`, `am_puck`, `am_santa`.
-
-**This list is this-machine-specific, not repo state.** The voice cache lives outside the repo (`~/.cache/fluidaudio/...`), so a fresh clone only has `am_michael` (the one preloaded at startup) — any other voice needs re-converting on that machine:
+`Sources/TTSBridgeCore/VoiceCatalog.swift` lists those 28 voices. Installed voices live in FluidAudio's cache outside the repo (`~/.cache/fluidaudio/Models/kokoro-82m-coreml/ANE/<voice>.bin`), so each machine installs its own. Install one from the Agentic Voice app's Settings, or:
 
 ```bash
-bridge/scripts/convert-voice.sh af_bella
+npm run bridge:voice -- af_bella
+# or: bridge/.build/release/TTSBridge install-voice af_bella
 ```
 
-The script needs no Python/torch: a Kokoro `.pt` voice file is an uncompressed zip, and the raw tensor bytes at `<voice>/data/0` are already byte-identical (little-endian float32, flat `[510,256]`) to what FluidAudio reads. The script downloads, unzips, validates the payload is exactly 522,240 bytes, and writes it to the cache path FluidAudio expects.
+No Python or torch is needed: a Kokoro `.pt` voice file is an uncompressed zip, and the raw tensor bytes at `<voice>/data/0` are already byte-identical (little-endian float32, flat `[510,256]`) to what FluidAudio reads. The installer downloads the official file from `hexgrad/Kokoro-82M`, extracts that entry with `/usr/bin/unzip`, checks it is exactly 522,240 bytes, and writes it atomically to the cache path.
 
 ## Extending
 
-`speed` (a positive float multiplier, default `1.0`) and `voice` are both accepted as multipart fields per the request contract in `Sources/TTSBridge/main.swift`. `language` is accepted but currently unused — the English variant has no runtime language switch.
+`speed` (a positive float multiplier, default `1.0`) and `voice` are both accepted as multipart fields per the request contract in `Sources/TTSBridgeCore/BridgeServer.swift`. `language` is accepted but currently unused — the English variant has no runtime language switch.

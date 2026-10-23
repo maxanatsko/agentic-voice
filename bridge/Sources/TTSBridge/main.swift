@@ -1,65 +1,36 @@
-import Vapor
-import FluidAudio
+import Foundation
+import TTSBridgeCore
 
-let defaultVoice = "am_michael"
-
-FileHandle.standardError.write("TTSBridge: loading Kokoro-ANE model (first run downloads it, may take a while)...\n".data(using: .utf8)!)
-
-let manager = KokoroAneManager()
-try await manager.initialize(preloadVoices: [defaultVoice])
-
-FileHandle.standardError.write("TTSBridge: model ready\n".data(using: .utf8)!)
-
-let app = try await Application.make(.detect())
-app.http.server.configuration.hostname = "127.0.0.1"
-app.http.server.configuration.port = 9000
-
-struct SynthesizeRequest: Content {
-    let text: String
-    let voice: String?
-    let language: String?
-    let speed: String?
+func logLine(_ message: String) {
+    FileHandle.standardError.write("TTSBridge: \(message)\n".data(using: .utf8)!)
 }
 
-struct HealthResponse: Content {
-    let status: String
-}
+let arguments = Array(CommandLine.arguments.dropFirst())
 
-// HTTP starts only after model initialization, so this endpoint is ready immediately.
-app.get("v1", "audio", "health") { req async -> HealthResponse in
-    HealthResponse(status: "ready")
-}
-
-app.on(.POST, "v1", "audio", "synthesize") { req async throws -> Response in
-    let payload = try req.content.decode(SynthesizeRequest.self)
-    let text = payload.text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty else {
-        throw Abort(.badRequest, reason: "text is required")
+if arguments.first == "install-voice" {
+    guard arguments.count == 2 else {
+        logLine("usage: TTSBridge install-voice <voice-id, e.g. af_bella>")
+        exit(64)
     }
-
-    let requestedVoice = payload.voice?.trimmingCharacters(in: .whitespacesAndNewlines)
-    let voice = (requestedVoice?.isEmpty == false ? requestedVoice! : defaultVoice)
-
-    let requestedSpeed = payload.speed?.trimmingCharacters(in: .whitespacesAndNewlines)
-    let speed: Float
-    if let requestedSpeed, !requestedSpeed.isEmpty {
-        guard let parsed = Float(requestedSpeed), parsed > 0 else {
-            throw Abort(.badRequest, reason: "speed must be a positive number")
-        }
-        speed = parsed
-    } else {
-        speed = KokoroAneConstants.defaultSpeed
+    do {
+        try await VoiceStore.install(arguments[1])
+        print("installed: \(VoiceStore.directory.appendingPathComponent("\(arguments[1]).bin").path)")
+        exit(0)
+    } catch {
+        logLine(error.localizedDescription)
+        exit(1)
     }
-
-    let wavData = try await manager.synthesize(text: text, voice: voice, speed: speed)
-
-    var headers = HTTPHeaders()
-    headers.replaceOrAdd(name: .contentType, value: "audio/wav")
-    return Response(status: .ok, headers: headers, body: .init(data: wavData))
 }
 
-app.get { req async -> String in
-    "TTSBridge (FluidAudio Kokoro-ANE) is running.\n"
-}
+logLine("loading Kokoro-ANE model (first run downloads it, may take a while)...")
+let manager = try await BridgeServer.prepare()
+logLine("model ready")
 
-try await app.execute()
+let app = try await BridgeServer.makeApplication(manager: manager)
+do {
+    try await app.execute()
+} catch {
+    try? await app.asyncShutdown()
+    throw error
+}
+try await app.asyncShutdown()

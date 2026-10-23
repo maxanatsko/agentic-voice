@@ -50,7 +50,7 @@ Responsibilities are intentionally narrow:
 
 - Node.js 26+
 - A built bundled bridge, or an externally managed TTS backend. MCP automatically starts the bundled bridge at `http://127.0.0.1:9000` when needed.
-- To build/run the bundled bridge: Xcode 15+ / Swift 5.9+ (macOS, Apple Silicon).
+- To build/run the bundled bridge: macOS 26+ on Apple Silicon with Xcode 26+ / Swift 6.2+.
 - A local WAV player: `afplay` on macOS or `aplay` on Linux, unless overridden.
 
 The TTS backend can run on a separate machine reachable over HTTP — set `TTS_URL` to that host.
@@ -91,7 +91,7 @@ Run the MCP server over stdio:
 npm start
 ```
 
-MCP reuses a healthy bundled bridge or launches the already-built `bridge/.build/debug/TTSBridge` as a separate process. No separate terminal is needed. Startup never installs dependencies or compiles code. The bridge's first model initialization can download missing FluidAudio assets; later starts reuse its cache. MCP initialization and tool listing remain available during initialization, and `speak` waits for readiness (up to five minutes). If the bridge fails to become ready, MCP stays connected and each `speak` call returns the startup error; restart MCP after fixing the cause. Bridge output and actionable startup failures go to stderr; stdout contains only MCP protocol messages.
+MCP reuses a healthy bundled bridge or launches the already-built `bridge/.build/release/TTSBridge` as a separate process. No separate terminal is needed. Startup never installs dependencies or compiles code. The bridge's first model initialization can download missing FluidAudio assets; later starts reuse its cache. MCP initialization and tool listing remain available during initialization, and `speak` waits for readiness (up to five minutes). If the bridge fails to become ready, MCP stays connected and each `speak` call returns the startup error; restart MCP after fixing the cause. Bridge output and actionable startup failures go to stderr; stdout contains only MCP protocol messages.
 
 Automatic bridge management applies only to HTTP loopback URLs (`127.0.0.1`, `localhost`, or `::1`) on port 9000 without a base path, query, credentials, or fragment. These aliases use the bundled bridge's IPv4 listener. Remote URLs and other custom endpoints are externally managed: MCP connects through the existing synthesis contract and never starts a local bridge for them.
 
