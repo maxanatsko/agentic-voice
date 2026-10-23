@@ -7,7 +7,8 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "TTSBridge", targets: ["TTSBridge"])
+        .executable(name: "TTSBridge", targets: ["TTSBridge"]),
+        .executable(name: "AgenticVoice", targets: ["AgenticVoice"])
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.110.0"),
@@ -25,6 +26,11 @@ let package = Package(
         ),
         .executableTarget(
             name: "TTSBridge",
+            dependencies: ["TTSBridgeCore"]
+        ),
+        // The menu bar app; scripts/build-app.sh wraps it in "Agentic Voice.app".
+        .executableTarget(
+            name: "AgenticVoice",
             dependencies: ["TTSBridgeCore"]
         )
     ]
