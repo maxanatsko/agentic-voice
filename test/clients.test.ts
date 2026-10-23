@@ -143,6 +143,7 @@ test('refuses a codex table defined outside the managed block, however it is wri
   for (const header of [
     '[mcp_servers.agentic-voice]', '[mcp_servers."agentic-voice"] # mine', "[ mcp_servers . 'agentic-voice' ]",
     'mcp_servers.agentic-voice.command = "node"', 'mcp_servers = { agentic-voice = { command = "node" } }',
+    '[mcp_servers."agentic\\u002Dvoice"]', 'mcp_servers."agentic\\u002Dvoice".command = "node"',
   ]) {
     assert.throws(
       () => upsertTomlBlock(`${header}\ncommand = "node"\n`, 'config.toml', 'mcp_servers.agentic-voice', 'command = "x"\n'),
