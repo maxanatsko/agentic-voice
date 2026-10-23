@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import TTSBridgeCore
 import Vapor
@@ -43,8 +44,9 @@ final class BridgeHost: ObservableObject {
     func stop() async {
         task?.cancel()
         task = nil
+        let app = self.app
+        self.app = nil
         try? await app?.asyncShutdown()
-        app = nil
         startupLock?.release()
         startupLock = nil
     }
@@ -89,6 +91,14 @@ final class BridgeHost: ObservableObject {
         let app = try await BridgeServer.makeApplication(manager: manager)
         try await app.startup()
         self.app = app
+        // Vapor's serve command takes over SIGTERM and SIGINT and only reports them through
+        // `running`, which nothing else here waits on; quit as the signal asks.
+        Task { [weak self] in
+            try? await app.running?.onStop.get()
+            guard let self, self.app === app else { return }
+            await self.stop()
+            NSApp.terminate(nil)
+        }
     }
 
     private func show(_ progress: BridgeProgress) {
