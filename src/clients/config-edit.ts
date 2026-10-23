@@ -104,9 +104,19 @@ export function removeHook(text: string, path: string, event: string): string {
   return render(Object.keys(remaining).length ? { ...root, hooks: remaining } : withoutHooks);
 }
 
-/** A dotted TOML key without spacing or quotes: ` a . "b" ` → ['a', 'b']. */
+/** A dotted TOML key without spacing, quotes or escapes: ` a . "bc" ` → ['a', 'bc']. */
 function keyPath(key: string): string[] {
-  return key.split('.').map((part) => part.trim().replace(/^(["'])(.*)\1$/, '$2'));
+  return key.split('.').map((part) => {
+    const trimmed = part.trim();
+    if (/^".*"$/.test(trimmed)) {
+      try {
+        return JSON.parse(trimmed) as string; // JSON escapes cover TOML basic-string escapes in practice.
+      } catch {
+        return trimmed.slice(1, -1);
+      }
+    }
+    return trimmed.replace(/^'(.*)'$/, '$1');
+  });
 }
 
 /**
