@@ -159,6 +159,23 @@ test('refuses a codex table defined outside the managed block, however it is wri
   }
 });
 
+test('refuses to replace a config container that is not an object', async () => {
+  const f = await fixture();
+  try {
+    const cursor = JSON.stringify({ mcpServers: [{ name: 'mine' }] });
+    const claude = JSON.stringify({ hooks: { Notification: { command: 'say hi' } } });
+    await f.put('.cursor/mcp.json', cursor);
+    await f.put('.claude/settings.json', claude);
+    await assert.rejects(installClient(f.context, 'cursor'), /"mcpServers" is not an object/);
+    await assert.rejects(installClient(f.context, 'claude-code'), /"Notification" is not an array/);
+    assert.equal(await f.read('.cursor/mcp.json'), cursor);
+    assert.equal(await f.read('.claude/settings.json'), claude);
+    assert.deepEqual((await f.json('.claude.json').catch(() => ({}))).mcpServers ?? {}, {});
+  } finally {
+    await f.dispose();
+  }
+});
+
 test('accepts agentic-voice keys outside mcp_servers, such as a Codex plugin marketplace', () => {
   const codex = [
     '[marketplaces.agentic-voice]', 'source = "/Users/me/agentic-voice"', '',

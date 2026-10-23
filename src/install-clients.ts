@@ -2,7 +2,7 @@ import { homedir } from 'node:os';
 import { clientIds, installClient, status, uninstallClient, type ClientId, type ClientStatus } from './clients/clients.js';
 import { pluginRoot } from './runtime-paths.js';
 
-const usage = `usage: install-clients <status|install|uninstall> [client...]\nclients: ${clientIds.join(', ')}`;
+const usage = `usage: install-clients status [client...]\n       install-clients <install|uninstall> <client...>\nclients: ${clientIds.join(', ')}`;
 
 function parseClients(values: string[]): ClientId[] {
   for (const value of values) {
