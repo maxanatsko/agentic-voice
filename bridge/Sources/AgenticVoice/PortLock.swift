@@ -1,12 +1,10 @@
 import Darwin
 
 /// An exclusive bind on a 127.0.0.1 port, used as a cross-process lock. The OS releases it if
-/// this process exits. Node's agentic-voice processes take the same ports the same way.
+/// this process exits. Node's BridgeProcess takes the same port the same way.
 final class PortLock {
     /// Coordinates which process starts the bridge, so only one loads the model.
     static let bridgeStartup: UInt16 = 19000
-    /// Held by whichever process is speaking, so sessions never talk over each other.
-    static let speaking: UInt16 = 19001
 
     private var descriptor: Int32
 
@@ -18,7 +16,7 @@ final class PortLock {
     static func acquire(_ port: UInt16) -> PortLock? {
         let descriptor = socket(AF_INET, SOCK_STREAM, 0)
         guard descriptor >= 0 else { return nil }
-        // Children (node, afplay) must not inherit the lock and keep it alive.
+        // Children (node) must not inherit the lock and keep it alive.
         _ = fcntl(descriptor, F_SETFD, FD_CLOEXEC)
 
         var address = sockaddr_in()

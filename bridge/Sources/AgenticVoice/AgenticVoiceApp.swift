@@ -32,6 +32,8 @@ struct MenuContent: View {
             Text(loginItemError)
         }
         Divider()
+        Button("Settings…") { SettingsWindow.show(host: host) }
+            .keyboardShortcut(",")
         Toggle("Launch at Login", isOn: $launchAtLogin)
             .onChange(of: launchAtLogin) { _, enabled in
                 // Resetting the toggle after a failure lands here too; there is nothing to change then.
