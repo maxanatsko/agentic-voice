@@ -50,7 +50,7 @@ Responsibilities are intentionally narrow:
 
 - Node.js 22+
 - A built bundled bridge, or an externally managed TTS backend. MCP automatically starts the bundled bridge at `http://127.0.0.1:9000` when needed.
-- To build/run the bundled bridge: Xcode 15+ / Swift 5.9+ (macOS, Apple Silicon).
+- To build/run the bundled bridge: Xcode 16+ / Swift 6.0+ (macOS, Apple Silicon; FluidAudio requires Swift tools 6.0).
 - A local WAV player: `afplay` on macOS or `aplay` on Linux, unless overridden.
 
 The TTS backend can run on a separate machine reachable over HTTP — set `TTS_URL` to that host.
@@ -123,7 +123,7 @@ printf '%s' "The task finished successfully." | npm run speak
 
 ## macOS app
 
-`Agentic Voice.app` is a menu bar app (no Dock icon) that keeps the voice engine running at `127.0.0.1:9000`, so MCP servers, the CLI and hooks always find a bridge to use, and none of them owns it. Build it from source on an Apple Silicon Mac with Node 26+ and Xcode 15+:
+`Agentic Voice.app` is a menu bar app (no Dock icon) that keeps the voice engine running at `127.0.0.1:9000`, so MCP servers, the CLI and hooks always find a bridge to use, and none of them owns it. Build it from source on an Apple Silicon Mac with Node 26+ and Xcode 16+:
 
 ```bash
 npm run app:build   # → build/Agentic Voice.app (ad-hoc signed, not notarized)
