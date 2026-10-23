@@ -47,7 +47,7 @@ Responsibilities are intentionally narrow:
 
 ## Requirements
 
-- Node.js 22+
+- Node.js 26+
 - A built bundled bridge, or an externally managed TTS backend. MCP automatically starts the bundled bridge at `http://127.0.0.1:9000` when needed.
 - To build/run the bundled bridge: Xcode 15+ / Swift 5.9+ (macOS, Apple Silicon).
 - A local WAV player: `afplay` on macOS or `aplay` on Linux, unless overridden.
