@@ -21,7 +21,8 @@
     "bridge:start": "swift run -c release --package-path bridge TTSBridge",
     "setup": "npm install && npm run build && npm run bridge:build",
     "clients": "node dist/src/install-clients.js",
-    "bridge:voice": "swift run -c release --package-path bridge TTSBridge install-voice"
+    "bridge:voice": "swift run -c release --package-path bridge TTSBridge install-voice",
+    "app:build": "bash scripts/build-app.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

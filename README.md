@@ -121,6 +121,16 @@ Or pipe text from a hook:
 printf '%s' "The task finished successfully." | npm run speak
 ```
 
+## macOS app
+
+`Agentic Voice.app` is a menu bar app (no Dock icon) that keeps the voice engine running at `127.0.0.1:9000`, so MCP servers, the CLI and hooks always find a bridge to use, and none of them owns it. Build it from source on an Apple Silicon Mac running macOS 26+, with Node 26+ and Xcode 26+:
+
+```bash
+npm run app:build   # → build/Agentic Voice.app (ad-hoc signed, not notarized)
+```
+
+Move it to `/Applications` and open it. On first run it downloads the model and the default voice, showing progress in the menu. It follows the same rules as MCP's bridge management: if a healthy bridge is already running it uses that one and takes over when it goes away, and it takes the `127.0.0.1:19000` startup lock so only one process loads the model. The menu offers Launch at Login and Quit. Quitting stops the engine; MCP servers that were using it can't speak until they restart.
+
 ## Install into clients
 
 `npm run clients -- <install|uninstall> <client...>` adds or removes the `agentic-voice` MCP server, and the input-needed hook where the client supports one, in each client's user-level config. The Agentic Voice macOS app runs the same command. Entries use absolute paths to the running `node` and to this checkout, so rerun `install` after moving either; `status` reports such entries as not `current`. Install and uninstall need the client names, so nothing is written to a client you did not pick; `npm run clients -- status [client...]` reports every client when none is named. Output is JSON, one object per client.
