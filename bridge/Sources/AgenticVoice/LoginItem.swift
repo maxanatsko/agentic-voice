@@ -17,23 +17,23 @@ enum LoginItem {
 }
 
 /// The Launch at Login toggle, for the menu and onboarding, with the reason it couldn't change.
+/// It reads the system's state rather than caching it, so copies in both places agree.
 struct LaunchAtLoginToggle: View {
-    @State private var launchAtLogin = LoginItem.isEnabled
     @State private var error: String?
+    /// Bumped after each change, so this copy redraws with the system's state.
+    @State private var changes = 0
 
     var body: some View {
-        Toggle("Launch at Login", isOn: $launchAtLogin)
-            .onChange(of: launchAtLogin) { _, enabled in
-                // Resetting the toggle after a failure lands here too; there is nothing to change then.
-                guard enabled != LoginItem.isEnabled else { return }
-                do {
-                    try LoginItem.set(enabled)
-                    error = nil
-                } catch {
-                    self.error = "Launch at login: \(error.localizedDescription)"
-                    launchAtLogin = LoginItem.isEnabled
-                }
+        Toggle("Launch at Login", isOn: Binding(get: { LoginItem.isEnabled }, set: { enabled in
+            do {
+                try LoginItem.set(enabled)
+                error = nil
+            } catch {
+                self.error = "Launch at login: \(error.localizedDescription)"
             }
+            changes += 1
+        }))
+        .id(changes)
         if let error {
             Text(error)
         }

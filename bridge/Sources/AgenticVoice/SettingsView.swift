@@ -244,7 +244,10 @@ struct VoicesTab: View {
             }
         }
         .sheet(isPresented: $cloning) {
-            CloneVoiceView(model: model) { cloning = false }
+            CloneVoiceView(model: model) { id in
+                cloning = false
+                if let id { model.select(voice: id) }
+            }
                 .frame(width: 520, height: 620)
         }
     }

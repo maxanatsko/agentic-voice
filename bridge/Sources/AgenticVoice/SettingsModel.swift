@@ -71,11 +71,10 @@ final class SettingsModel: ObservableObject {
         save { $0.speed = rounded }
     }
 
-    /// Saves the selected voice even when it's the default, so the settings file exists and the
-    /// app no longer opens onboarding. Returns whether it was saved.
-    func finishOnboarding() -> Bool {
-        let voice = selectedVoice
-        return save { $0.voice = voice }
+    /// Saves the voice chosen in onboarding, even when it's the default, so the settings file
+    /// exists and the app no longer opens onboarding. Returns whether it was saved.
+    func finishOnboarding(voice: String) -> Bool {
+        save { $0.voice = voice }
     }
 
     /// Publishes the change only once it's on disk, so the window never shows a value agents don't use.
@@ -122,13 +121,14 @@ final class SettingsModel: ObservableObject {
         refreshVoices()
     }
 
-    /// Clones the sample and selects the new voice. Throws so the clone sheet can show why it failed.
-    func cloneVoice(name: String, from sample: URL) async throws {
+    /// Clones the sample and returns the new voice's id, leaving selecting it to the caller.
+    /// Throws so the clone sheet can show why it failed.
+    func cloneVoice(name: String, from sample: URL) async throws -> String {
         cloning = true
         defer { cloning = false }
         let id = try await ClonedVoiceStore.clone(name: name, from: sample)
         refreshVoices()
-        select(voice: id)
+        return id
     }
 
     func remove(_ voice: Voice) {

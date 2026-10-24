@@ -62,6 +62,10 @@ struct OnboardingView: View {
     let onClose: () -> Void
     @State private var step = OnboardingStep.welcome
     @State private var cloning = false
+    /// Saved only by Done, so closing onboarding early leaves no settings file and it opens again.
+    @State private var voice: String?
+
+    private var chosenVoice: Voice { Voice(id: voice ?? model.selectedVoice) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -87,17 +91,21 @@ struct OnboardingView: View {
                         }
                     }
                 case .voice:
-                    GeneralTab(model: model, host: host)
                     Section {
-                        LabeledContent("Hear the selected voice") {
-                            Button("Preview", systemImage: "play.fill") { Task { await model.play(Voice(id: model.selectedVoice)) } }
-                                .disabled(!model.engineReady || model.previewing || !model.isInstalled(Voice(id: model.selectedVoice)))
+                        Picker("Voice", selection: Binding(get: { chosenVoice.id }, set: { voice = $0 })) {
+                            ForEach(model.voiceChoices) { choice in
+                                Text(model.isInstalled(choice) ? "\(choice.name) — \(choice.accent)" : "\(choice.name) — not installed").tag(choice.id)
+                            }
+                        }
+                        LabeledContent("Hear it") {
+                            Button("Preview", systemImage: "play.fill") { Task { await model.play(chosenVoice) } }
+                                .disabled(!model.engineReady || model.previewing || !model.isInstalled(chosenVoice))
                         }
                         LabeledContent("Sound like yourself") {
                             Button("Clone My Voice…", systemImage: "mic.fill") { cloning = true }
                         }
                     } footer: {
-                        Text("More built-in voices are in Settings → Voices.")
+                        Text("More built-in voices and the speaking speed are in Settings.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 case .agents:
@@ -118,7 +126,7 @@ struct OnboardingView: View {
                 Spacer()
                 if step == .finish {
                     Button("Done") {
-                        if model.finishOnboarding() { onClose() }
+                        if model.finishOnboarding(voice: chosenVoice.id) { onClose() }
                     }
                     .keyboardShortcut(.defaultAction)
                 } else {
@@ -134,7 +142,10 @@ struct OnboardingView: View {
             if ready { model.refreshVoices() }
         }
         .sheet(isPresented: $cloning) {
-            CloneVoiceView(model: model) { cloning = false }
+            CloneVoiceView(model: model) { id in
+                cloning = false
+                if let id { voice = id }
+            }
                 .frame(width: 520, height: 620)
         }
         .alert("Agentic Voice", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
