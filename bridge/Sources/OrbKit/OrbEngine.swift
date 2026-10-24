@@ -575,7 +575,7 @@ public enum OrbEngine {
 
     // MARK: Morph
 
-    private typealias Shape = (Double) -> (Double, Double)
+    private typealias Shape = @Sendable (Double) -> (Double, Double)
 
     private static func polyPath(_ verts: [(Double, Double)]) -> Shape {
         let v = verts.count
@@ -587,7 +587,7 @@ public enum OrbEngine {
             lens.append(l)
             total += l
         }
-        return { f in
+        return { [lens, total] f in
             var target = f * total
             var i = 0
             while target > lens[i] && i < v - 1 {
