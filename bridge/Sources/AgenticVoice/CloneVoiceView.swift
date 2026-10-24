@@ -80,9 +80,10 @@ struct CloneVoiceView: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(sample == nil || recorder.isRecording || name.trimmingCharacters(in: .whitespaces).isEmpty || !consent)
             }
-            .disabled(model.cloning)
             .padding()
         }
+        // Changing the sample mid-clone would delete the file the clone is still reading.
+        .disabled(model.cloning)
         .fileImporter(isPresented: $importing, allowedContentTypes: [.audio]) { result in
             switch result {
             case .success(let url):
