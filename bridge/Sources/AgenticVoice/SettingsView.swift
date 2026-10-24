@@ -8,12 +8,10 @@ import TTSBridgeCore
 @MainActor
 enum SettingsWindow {
     private static var window: NSWindow?
-    private static var model: SettingsModel?
 
-    static func show(host: BridgeHost) {
+    static func show(model: SettingsModel) {
         if window == nil {
-            let model = SettingsModel(host: host)
-            let controller = NSHostingController(rootView: SettingsView(model: model, host: host))
+            let controller = NSHostingController(rootView: SettingsView(model: model, host: model.host))
             // Lets the split view's sidebar run under the titlebar, as in System Settings.
             controller.sceneBridgingOptions = .all
             let window = NSWindow(contentViewController: controller)
@@ -25,10 +23,9 @@ enum SettingsWindow {
             window.setContentSize(NSSize(width: 720, height: 560))
             window.center()
             self.window = window
-            self.model = model
         }
         // Reread on every open: settings and clients may have changed from the terminal since.
-        if let model { Task { await model.load() } }
+        Task { await model.load() }
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }

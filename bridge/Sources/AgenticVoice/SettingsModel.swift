@@ -71,8 +71,16 @@ final class SettingsModel: ObservableObject {
         save { $0.speed = rounded }
     }
 
+    /// Saves the selected voice even when it's the default, so the settings file exists and the
+    /// app no longer opens onboarding. Returns whether it was saved.
+    func finishOnboarding() -> Bool {
+        let voice = selectedVoice
+        return save { $0.voice = voice }
+    }
+
     /// Publishes the change only once it's on disk, so the window never shows a value agents don't use.
-    private func save(_ change: (inout AppSettings) -> Void) {
+    @discardableResult
+    private func save(_ change: (inout AppSettings) -> Void) -> Bool {
         if unreadableSettings != nil {
             // The user may have fixed or deleted the file since; apply the change to what's there now.
             do {
@@ -81,7 +89,7 @@ final class SettingsModel: ObservableObject {
             } catch {
                 unreadableSettings = error.localizedDescription
                 message = "Not saved, so the existing file isn't replaced. \(error.localizedDescription)"
-                return
+                return false
             }
         }
         var next = settings
@@ -89,8 +97,10 @@ final class SettingsModel: ObservableObject {
         do {
             try next.save()
             settings = next
+            return true
         } catch {
             message = "Couldn't save settings: \(error.localizedDescription)"
+            return false
         }
     }
 
