@@ -1,6 +1,12 @@
-/// A Kokoro-82M voice whose accent matches the English text frontend.
+/// A Kokoro-82M voice whose accent matches the English text frontend, or a cloned voice.
 public struct Voice: Identifiable, Hashable, Sendable {
     public let id: String
+
+    public init(id: String) {
+        self.id = id
+    }
+
+    public var isCloned: Bool { ClonedVoiceStore.isValid(id) }
 
     /// "Michael", from the id's suffix.
     public var name: String {
@@ -10,6 +16,7 @@ public struct Voice: Identifiable, Hashable, Sendable {
 
     /// "US male", from the id's two-letter prefix.
     public var accent: String {
+        if isCloned { return "Your voice" }
         let accent = id.hasPrefix("a") ? "US" : "UK"
         return id.dropFirst().hasPrefix("f") ? "\(accent) female" : "\(accent) male"
     }

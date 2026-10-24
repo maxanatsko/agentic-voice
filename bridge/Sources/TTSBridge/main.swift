@@ -22,6 +22,21 @@ if arguments.first == "install-voice" {
     }
 }
 
+if arguments.first == "clone-voice" {
+    guard arguments.count == 3 else {
+        logLine("usage: TTSBridge clone-voice <name, e.g. max> <audio file, \(Int(ClonedVoiceStore.usedSeconds)) s or longer works best>")
+        exit(64)
+    }
+    do {
+        logLine("cloning (the first clone downloads the PocketTTS model, may take a while)...")
+        print(try await ClonedVoiceStore.clone(name: arguments[1], from: URL(fileURLWithPath: arguments[2])))
+        exit(0)
+    } catch {
+        logLine(error.localizedDescription)
+        exit(1)
+    }
+}
+
 logLine("loading Kokoro-ANE model (first run downloads it, may take a while)...")
 let manager = try await BridgeServer.prepare()
 logLine("model ready")

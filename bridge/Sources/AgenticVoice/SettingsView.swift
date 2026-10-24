@@ -61,7 +61,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     var summary: String {
         switch self {
         case .general: return "Choose the voice and speed agents speak with, and check the voice engine."
-        case .voices: return "Install, preview and remove the voices Agentic Voice can speak with."
+        case .voices: return "Clone your own voice, or install, preview and remove the built-in ones."
         case .clients: return "Connect Agentic Voice to the coding agents on this Mac."
         }
     }
@@ -145,9 +145,8 @@ struct GeneralTab: View {
         Group {
             Section {
                 Picker("Voice", selection: Binding(get: { model.selectedVoice }, set: { model.select(voice: $0) })) {
-                    // The selected voice stays listed when it's missing, so the picker says why speech fails.
-                    ForEach(VoiceCatalog.voices.filter { model.installedVoices.contains($0.id) || $0.id == model.selectedVoice }) { voice in
-                        Text(model.installedVoices.contains(voice.id) ? "\(voice.name) — \(voice.accent)" : "\(voice.name) — not installed").tag(voice.id)
+                    ForEach(model.voiceChoices) { voice in
+                        Text(model.isInstalled(voice) ? "\(voice.name) — \(voice.accent)" : "\(voice.name) — not installed").tag(voice.id)
                     }
                 }
                 LabeledContent("Speed") {
@@ -174,7 +173,7 @@ struct GeneralTab: View {
             } header: {
                 Text("Speech")
             } footer: {
-                Text("Applies to every agent on its next spoken message. TTS_VOICE or VOICE_SPEED in .env or the environment override these.")
+                Text("Applies to every agent on its next spoken message. Cloned voices speak at their natural pace; speed applies to built-in voices. TTS_VOICE or VOICE_SPEED in .env or the environment override these.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             Section("Voice Engine") {
@@ -209,6 +208,7 @@ struct EngineStatusIcon: View {
 struct VoicesTab: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var host: BridgeHost
+    @State private var cloning = false
 
     /// The catalog grouped by accent, in catalog order.
     private var accents: [(name: String, voices: [Voice])] {
@@ -224,6 +224,15 @@ struct VoicesTab: View {
     var body: some View {
         let accents = accents
         Group {
+            Section {
+                ForEach(model.clonedVoices) { voice in row(voice) }
+                Button("Clone a Voice…", systemImage: "plus.circle") { cloning = true }
+            } header: {
+                Text("Your Voices")
+            } footer: {
+                Text("Cloned voices speak with PocketTTS by Kyutai, on this Mac.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
             ForEach(accents, id: \.name) { accent in
                 Section {
                     ForEach(accent.voices) { voice in row(voice) }
@@ -237,13 +246,17 @@ struct VoicesTab: View {
                 }
             }
         }
+        .sheet(isPresented: $cloning) {
+            CloneVoiceView(model: model) { cloning = false }
+                .frame(width: 520, height: 620)
+        }
     }
 
     private func row(_ voice: Voice) -> some View {
         LabeledContent {
             if model.busyVoices.contains(voice.id) {
                 ProgressView().controlSize(.small)
-            } else if model.installedVoices.contains(voice.id) {
+            } else if model.isInstalled(voice) {
                 HStack(spacing: 6) {
                     Button("Preview", systemImage: "play.fill") { Task { await model.play(voice) } }
                         .disabled(!model.engineReady || model.previewing)

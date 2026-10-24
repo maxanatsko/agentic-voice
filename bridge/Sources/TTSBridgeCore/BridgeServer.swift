@@ -10,6 +10,7 @@ public enum BridgeProgress: Sendable {
 
 /// The HTTP contract the Node client speaks:
 /// `GET /v1/audio/health` and `POST /v1/audio/synthesize` (multipart `text`/`voice`/`language`/`speed`) → WAV.
+/// Kokoro speaks the catalog voices; PocketTTS speaks cloned (`clone_`) voices.
 public enum BridgeServer {
     public static let port = 9000
 
@@ -39,6 +40,7 @@ public enum BridgeServer {
         let app = try await Application.make(Environment(name: "development", arguments: ["agentic-voice-bridge"]))
         app.http.server.configuration.hostname = "127.0.0.1"
         app.http.server.configuration.port = port
+        let clonedVoices = ClonedVoiceStore.Speaker()
 
         // HTTP starts only after model initialization, so this endpoint is ready immediately.
         app.get("v1", "audio", "health") { _ async -> HealthResponse in
@@ -54,6 +56,13 @@ public enum BridgeServer {
 
             let requestedVoice = payload.voice?.trimmingCharacters(in: .whitespacesAndNewlines)
             let voice = requestedVoice?.isEmpty == false ? requestedVoice! : VoiceCatalog.defaultVoice
+            if ClonedVoiceStore.isValid(voice) {
+                guard ClonedVoiceStore.isInstalled(voice) else {
+                    throw Abort(.badRequest, reason: "cloned voice \(voice) doesn't exist; clone it again in Agentic Voice or run TTSBridge clone-voice")
+                }
+                // PocketTTS has no speed control; cloned voices speak at their natural pace.
+                return wav(try await clonedVoices.synthesize(text: text, voice: voice))
+            }
             guard VoiceStore.isInstalled(voice) else {
                 throw Abort(.badRequest, reason: "voice \(voice) is not installed; install it in Agentic Voice or run TTSBridge install-voice \(voice)")
             }
@@ -69,18 +78,20 @@ public enum BridgeServer {
                 speed = KokoroAneConstants.defaultSpeed
             }
 
-            let wavData = try await manager.synthesize(text: text, voice: voice, speed: speed)
-
-            var headers = HTTPHeaders()
-            headers.replaceOrAdd(name: .contentType, value: "audio/wav")
-            return Response(status: .ok, headers: headers, body: .init(data: wavData))
+            return wav(try await manager.synthesize(text: text, voice: voice, speed: speed))
         }
 
         app.get { _ async -> String in
-            "TTSBridge (FluidAudio Kokoro-ANE) is running.\n"
+            "TTSBridge (FluidAudio Kokoro-ANE, PocketTTS for cloned voices) is running.\n"
         }
 
         return app
+    }
+
+    private static func wav(_ data: Data) -> Response {
+        var headers = HTTPHeaders()
+        headers.replaceOrAdd(name: .contentType, value: "audio/wav")
+        return Response(status: .ok, headers: headers, body: .init(data: data))
     }
 }
 

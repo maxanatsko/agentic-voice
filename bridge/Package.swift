@@ -17,7 +17,7 @@ let package = Package(
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.1")
     ],
     targets: [
-        // Synthesis server, model preparation and voice installation, shared by the
+        // Synthesis server, model preparation, voice installation and cloning, shared by the
         // TTSBridge command-line executable and the Agentic Voice app.
         .target(
             name: "TTSBridgeCore",
@@ -50,6 +50,10 @@ let package = Package(
         .testTarget(
             name: "AgenticVoiceKitTests",
             dependencies: ["AgenticVoiceKit"]
+        ),
+        .testTarget(
+            name: "TTSBridgeCoreTests",
+            dependencies: ["TTSBridgeCore"]
         )
     ]
 )
