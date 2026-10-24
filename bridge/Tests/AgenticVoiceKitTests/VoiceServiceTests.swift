@@ -87,7 +87,8 @@ struct VoiceServiceTests {
     @Test func synthesizesEveryChunkOfLongText() async throws {
         let fixture = try await Fixture()
         try fixture.finish()
-        let sentence = String(repeating: "word ", count: 40) + "end."
+        // Capitalized: a period before a lowercase word is no sentence break.
+        let sentence = "Start " + String(repeating: "word ", count: 39) + "end."
         let text = Array(repeating: sentence, count: 3).joined(separator: " ")
         #expect(try await fixture.voice(maxChars: 1200).speak(text) == .spoken)
         #expect(fixture.synthesized.value == 3)
