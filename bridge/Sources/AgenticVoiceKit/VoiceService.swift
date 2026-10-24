@@ -30,9 +30,55 @@ public struct VoiceService: Sendable {
         guard let claim = try player.claim() else { return .busy }
         defer { claim.release() }
         // Holding the claim through synthesis keeps another session from cutting in before playback.
-        let wav = try await tts.synthesize(prepared)
-        try await player.play(wav)
+        // Each chunk is synthesized while the one before it plays.
+        let chunks = Self.chunk(prepared, limit: Self.chunkLimit)
+        var next = Task { try await tts.synthesize(chunks[0]) }
+        defer { next.cancel() }
+        for index in chunks.indices {
+            let wav = try await next.value
+            if index + 1 < chunks.count {
+                next = Task { try await tts.synthesize(chunks[index + 1]) }
+            }
+            try await player.play(wav)
+        }
         return .spoken
+    }
+
+    /// Kokoro takes at most 510 phonemes per request (about 350 to 450 characters of English).
+    static let chunkLimit = 320
+
+    /// Sentences packed into chunks of at most `limit` characters; a longer sentence is split
+    /// between words. Expects whitespace already normalized to single spaces.
+    static func chunk(_ text: String, limit: Int) -> [String] {
+        var sentences: [String] = []
+        text.enumerateSubstrings(in: text.startIndex..., options: .bySentences) { sentence, _, _, _ in
+            if let sentence = sentence?.trimmingCharacters(in: .whitespaces), !sentence.isEmpty { sentences.append(sentence) }
+        }
+        if sentences.isEmpty { sentences = [text] }
+
+        var pieces: [String] = []
+        for sentence in sentences {
+            guard sentence.count > limit else { pieces.append(sentence); continue }
+            var current = ""
+            for word in sentence.split(separator: " ") {
+                if !current.isEmpty && current.count + word.count + 1 > limit {
+                    pieces.append(current)
+                    current = ""
+                }
+                current += current.isEmpty ? String(word) : " " + word
+            }
+            if !current.isEmpty { pieces.append(current) }
+        }
+
+        var chunks: [String] = []
+        for piece in pieces {
+            if let last = chunks.last, last.count + piece.count + 1 <= limit {
+                chunks[chunks.count - 1] = last + " " + piece
+            } else {
+                chunks.append(piece)
+            }
+        }
+        return chunks
     }
 
     public static func prepareSpeechText(_ text: String, maxChars: Int) throws -> String {

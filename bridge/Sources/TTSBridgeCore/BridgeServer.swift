@@ -8,7 +8,7 @@ public enum BridgeProgress: Sendable {
     case loadingModel
 }
 
-/// The HTTP contract the Node client speaks:
+/// The HTTP contract `AgenticVoiceKit.TTSClient` speaks:
 /// `GET /v1/audio/health` and `POST /v1/audio/synthesize` (multipart `text`/`voice`/`language`/`speed`) → WAV.
 /// Kokoro speaks the catalog voices; PocketTTS speaks cloned (`clone_`) voices.
 public enum BridgeServer {

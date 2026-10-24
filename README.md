@@ -72,7 +72,7 @@ Environment variables:
 | `TTS_VOICE` | `am_michael` | Voice id — see [`bridge/README.md`](bridge/README.md) for the full roster |
 | `TTS_LANGUAGE` | `en-US` | Locale sent to TTS |
 | `VOICE_SPEED` | `1.0` | Playback speed multiplier sent to TTS |
-| `VOICE_MAX_CHARS` | `360` | Hard limit for spoken text |
+| `VOICE_MAX_CHARS` | `1200` | Hard limit for spoken text. Longer text is synthesized in chunks of up to 320 characters, each prepared while the one before it plays |
 | `VOICE_PLAYBACK_COMMAND` | auto | Optional playback executable |
 
 ## Install and run
