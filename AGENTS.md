@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository provides a minimal local voice-output capability for coding agents, speaking through a local TTS backend over a fixed HTTP contract. Everything is one Swift package in `bridge/`: the `agentic-voice` command (MCP server, CLI, client installer), the bundled backend `TTSBridge`, which wraps Kokoro-82M via FluidAudio (not an NVIDIA product), and a macOS menu bar app (`bridge/Sources/AgenticVoice/`) that hosts that backend and offers settings, voice downloads and client installation. The only non-Swift code is the hook script (`hooks/`) and the opencode plugin shim (`opencode/`, plus the dependency-free `package.json` opencode needs to install it).
+This repository provides a minimal local voice-output capability for coding agents, speaking through a local TTS backend over a fixed HTTP contract. Everything is one Swift package in `bridge/`: the `agentic-voice` command (MCP server, CLI, client installer), the bundled backend `TTSBridge`, which wraps Kokoro-82M via FluidAudio (not an NVIDIA product) and speaks cloned (`clone_`) voices with FluidAudio's PocketTTS, and a macOS menu bar app (`bridge/Sources/AgenticVoice/`) that hosts that backend and offers settings, voice downloads and client installation. The only non-Swift code is the hook script (`hooks/`) and the opencode plugin shim (`opencode/`, plus the dependency-free `package.json` opencode needs to install it).
 
 ## Engineering principles
 
@@ -16,11 +16,11 @@ Keep boundaries explicit:
 - TTS backend HTTP details stay inside the TTS client (`AgenticVoiceKit/TTSClient.swift`).
 - Audio playback stays inside `AudioPlayer`.
 - Configuration parsing stays in `Config.swift`.
-- `TTSBridgeCore` owns the HTTP routes, model preparation and voice installation; the `TTSBridge` executable and the app only run it.
+- `TTSBridgeCore` owns the HTTP routes, model preparation, voice installation (`VoiceStore`) and voice cloning (`ClonedVoiceStore`); the `TTSBridge` executable and the app only run it. Kokoro and PocketTTS are chosen by voice id in the synthesis route, with no provider abstraction.
 - `AgenticVoiceKit` depends on the bridge only through the documented HTTP contract, never by importing `TTSBridgeCore` (keep Vapor and FluidAudio out of it). The `agentic-voice` command (`AgenticVoiceCLI`) and the app share it.
 - The macOS app is presentation only. It hosts `TTSBridgeCore`, writes the shared settings file, and calls `AgenticVoiceKit` for client installation and voice previews; it never edits client files or calls the TTS backend itself.
 - Client config editing stays in `AgenticVoiceKit/Clients/` (pure text edits in `ConfigEdit.swift`, file handling in `Clients.swift`).
-- `~/Library/Application Support/AgenticVoice/config.json` is the only persisted setting. `Config.swift` defines its format; the app reads and writes only `voice` and `speed`, applying the same rules. The app speaks (voice preview) only through `VoiceService`, never by calling the synthesis endpoint itself; its only direct HTTP request is the health check in the bridge startup protocol.
+- `~/Library/Application Support/AgenticVoice/config.json` is the only persisted setting. Cloned voices (`AgenticVoice/Voices/`) are voice data, like installed Kokoro voices, not settings. `Config.swift` defines its format; the app reads and writes only `voice` and `speed`, applying the same rules. The app speaks (voice preview) only through `VoiceService`, never by calling the synthesis endpoint itself; its only direct HTTP request is the health check in the bridge startup protocol.
 
 Do not let transport-specific objects leak into application code.
 

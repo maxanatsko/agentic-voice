@@ -15,7 +15,7 @@ The MVP exposes a single MCP tool, `speak`, and a small CLI, both in one Swift c
 
 - Speech-to-text or full duplex conversation.
 - An embedded LLM summarizer. The calling agent should summarize before invoking `speak`.
-- Voice cloning, queues, persistence, web UI, telemetry, or multi-provider abstraction in the MVP.
+- Queues, persistence, web UI, telemetry, or multi-provider abstraction in the MVP.
 
 ## Architecture
 
@@ -131,7 +131,7 @@ Move it to `/Applications` and open it. On first run it downloads the model and 
 Settings has three tabs:
 
 - **General**: the default voice and speed, saved to the shared settings file and applied on every agent's next spoken message. Also shows the voice engine's status.
-- **Voices**: install, preview or delete any of the 28 English voices. Preview speaks through the same `VoiceService` agents use, so it takes the same speaking lock and never talks over them.
+- **Voices**: clone your own voice, and install, preview or delete any of the 28 English voices. Preview speaks through the same `VoiceService` agents use, so it takes the same speaking lock and never talks over them. To clone, record yourself reading a short script (the app asks for microphone access) or choose an existing recording, then name the voice; it becomes a `clone_<name>` voice you can select like any other. See [voice cloning](bridge/README.md#voice-cloning).
 - **Clients**: install, update or uninstall agentic-voice in each client with the same installer as `agentic-voice clients` (see below), using your login shell's `PATH` so it can find `claude`. Client entries and hooks point at the bundled `agentic-voice` command, so they show as outdated if you move the app (or if they were written by an older, Node-based version); Update fixes them.
 
 ## Install into clients
