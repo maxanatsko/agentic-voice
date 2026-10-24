@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "agentic-voice": {
-      "command": "node",
-      "args": ["dist/src/server.js"],
+      "command": "/bin/sh",
+      "args": ["-c", "exec ./bridge/.build/release/agentic-voice mcp"],
       "cwd": ".",
       "tool_timeout_sec": 360
     }

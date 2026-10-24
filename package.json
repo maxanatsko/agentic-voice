@@ -4,33 +4,7 @@
   "private": true,
   "type": "module",
   "main": "opencode/plugin.mjs",
-  "description": "Local voice output for coding agents, backed by a local TTS bridge",
+  "description": "Local voice output for coding agents. This file only lets opencode install the plugin in opencode/; everything else is Swift (see bridge/).",
   "author": "Maxim Anatsko (https://maxanatsko.com)",
-  "license": "MIT",
-  "engines": {
-    "node": ">=26"
-  },
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/src/server.js",
-    "dev": "tsx src/server.ts",
-    "speak": "tsx src/cli.ts",
-    "test": "node --import tsx --test test/**/*.test.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "bridge:build": "swift build -c release --package-path bridge --product TTSBridge",
-    "bridge:start": "swift run -c release --package-path bridge TTSBridge",
-    "setup": "npm install && npm run build && npm run bridge:build",
-    "clients": "node dist/src/install-clients.js",
-    "bridge:voice": "swift run -c release --package-path bridge TTSBridge install-voice",
-    "app:build": "bash scripts/build-app.sh"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0",
-    "zod": "^4.1.0"
-  },
-  "devDependencies": {
-    "@types/node": "^26.0.0",
-    "tsx": "^4.20.0",
-    "typescript": "^6.0.0"
-  }
+  "license": "MIT"
 }

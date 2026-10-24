@@ -1,14 +1,14 @@
 import Foundation
 
 /// Runs a program to completion and captures its output. Callers keep it off the main thread.
-enum Shell {
-    struct Result {
-        let status: Int32
-        let stdout: String
-        let stderr: String
+public enum Shell {
+    public struct Result: Sendable {
+        public let status: Int32
+        public let stdout: String
+        public let stderr: String
     }
 
-    static func run(_ executable: String, _ arguments: [String], environment: [String: String]? = nil, timeout: TimeInterval = 60) throws -> Result {
+    public static func run(_ executable: String, _ arguments: [String], environment: [String: String]? = nil, timeout: TimeInterval = 60) throws -> Result {
         // Output goes to temporary files, not pipes: a grandchild that inherits a pipe (a daemon
         // started from a shell profile) would keep a pipe read blocked after the child is killed.
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("agentic-voice-\(UUID().uuidString)")

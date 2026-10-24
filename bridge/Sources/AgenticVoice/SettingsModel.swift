@@ -1,3 +1,4 @@
+import AgenticVoiceKit
 import Foundation
 import TTSBridgeCore
 
@@ -39,9 +40,9 @@ final class SettingsModel: ObservableObject {
         refreshVoices()
         // Clients show as loading, not as failed, while the shell PATH resolves.
         busyClients = true
-        shellPath = await Task.detached { BundledNode.loginShellPath() }.value
+        shellPath = await Task.detached { ClientInstaller.loginShellPath() }.value
         busyClients = false
-        await runInstaller("status")
+        await runInstaller(.status)
     }
 
     // MARK: Settings
@@ -107,10 +108,6 @@ final class SettingsModel: ObservableObject {
     }
 
     func play(_ voice: Voice) async {
-        guard let path = shellPath else {
-            message = "Settings is still starting up; try again in a moment."
-            return
-        }
         // One preview at a time: a second would hit the speaking lock and look like another session.
         previewing = true
         busyVoices.insert(voice.id)
@@ -118,26 +115,24 @@ final class SettingsModel: ObservableObject {
             previewing = false
             busyVoices.remove(voice.id)
         }
-        let speed = speed
-        let result = await Task.detached {
-            Result { try VoicePreview.play(voice, speed: speed, path: path) }
-        }.value
-        if case .failure(let error) = result {
+        do {
+            try await VoicePreview.play(voice, speed: speed)
+        } catch {
             message = error.localizedDescription
         }
     }
 
     // MARK: Clients
 
-    func install(client: ClientStatus) async { await runInstaller("install", [client.id]) }
-    func uninstall(client: ClientStatus) async { await runInstaller("uninstall", [client.id]) }
+    func install(client: ClientStatus) async { await runInstaller(.install, [client.id]) }
+    func uninstall(client: ClientStatus) async { await runInstaller(.uninstall, [client.id]) }
 
-    private func runInstaller(_ command: String, _ ids: [String] = []) async {
+    private func runInstaller(_ action: Clients.Action, _ ids: [String] = []) async {
         guard let path = shellPath else { return }
         busyClients = true
         defer { busyClients = false }
         let result = await Task.detached {
-            Result { try ClientInstaller.run(command, clients: ids, path: path) }
+            Result { try ClientInstaller.run(action, clients: ids, path: path) }
         }.value
         switch result {
         case .success(let statuses):
