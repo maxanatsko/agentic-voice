@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import Network
+import Synchronization
 
 /// A loopback HTTP server answering each request with `respond(path)`.
 final class TestHTTPServer: @unchecked Sendable {
@@ -61,8 +62,20 @@ final class TestHTTPServer: @unchecked Sendable {
     }
 }
 
-/// A port nothing listens on right now.
+/// Ports `freePort` already handed out in this test run.
+private let handedOut = Mutex<Set<UInt16>>([])
+
+/// A port nothing listens on right now, and never one an earlier call returned: the port is
+/// released before the caller binds it, so tests running in parallel could otherwise get the
+/// same one and take each other's lock or server.
 func freePort() -> UInt16 {
+    while true {
+        let port = ephemeralPort()
+        if handedOut.withLock({ $0.insert(port).inserted }) { return port }
+    }
+}
+
+private func ephemeralPort() -> UInt16 {
     let descriptor = socket(AF_INET, SOCK_STREAM, 0)
     defer { Darwin.close(descriptor) }
     var address = sockaddr_in()

@@ -25,7 +25,7 @@ jobs:
           restore-keys: swiftpm-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Test
-        run: swift test --package-path bridge
+        run: swift test --no-parallel --package-path bridge
 
       - name: Build app
         run: scripts/build-app.sh
