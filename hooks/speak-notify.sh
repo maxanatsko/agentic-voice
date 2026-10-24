@@ -10,5 +10,4 @@ case "$REASON" in
   *) TEXT="$PROJECT: $REASON" ;;
 esac
 
-# Hooks run in the agent's environment, which may lack the user's PATH; installers pass an absolute node.
-"${AGENTIC_VOICE_NODE:-node}" "$REPO_DIR/dist/src/cli.js" "$TEXT" >/dev/null 2>&1 || true
+"$REPO_DIR/bridge/.build/release/agentic-voice" speak "$TEXT" >/dev/null 2>&1 || true

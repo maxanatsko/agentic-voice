@@ -8,23 +8,16 @@ It exists because a real NVIDIA TTS NIM needs a Linux box with an NVIDIA GPU (Co
 
 ## Build / run
 
-Build/install is a prerequisite. Once built, the Codex MCP plugin launches this executable automatically when no healthy local bridge exists, waits for the model to initialize, and stops only the bridge child it owns. Swift remains a separate process. Manual startup is still useful for standalone CLI/hooks and diagnosing first-use initialization:
+Build/install is a prerequisite. Once built, the `agentic-voice` MCP server launches this executable automatically when no healthy local bridge exists, waits for the model to initialize, and stops only the bridge child it owns. Swift remains a separate process. Manual startup is still useful for standalone CLI/hooks and diagnosing first-use initialization:
 
 From the repo root:
-
-```bash
-npm run bridge:build
-npm run bridge:start
-```
-
-Or directly:
 
 ```bash
 swift build -c release --package-path bridge --product TTSBridge
 swift run -c release --package-path bridge TTSBridge
 ```
 
-The package has two parts: the `TTSBridgeCore` library (HTTP routes, model preparation and voice installation, in `Sources/TTSBridgeCore/`) and the thin `TTSBridge` executable that runs it. The Agentic Voice macOS app uses the same library, so there is one implementation of each.
+The package holds the whole project. `TTSBridgeCore` (HTTP routes, model preparation and voice installation, in `Sources/TTSBridgeCore/`) is run by the thin `TTSBridge` executable and by the Agentic Voice macOS app, so there is one implementation of each. `AgenticVoiceKit` (`Sources/AgenticVoiceKit/`) holds speaking, the bridge startup protocol and client installation; it reaches the bridge only over HTTP and is shared by the `agentic-voice` command (`Sources/AgenticVoiceCLI/`: MCP server, CLI, client installer) and the app. Tests: `swift test --package-path bridge`.
 
 First run downloads the model from HuggingFace (roughly a minute) and caches it outside this repo at `~/.cache/fluidaudio/Models/` — that cache is FluidAudio's own convention, not something this repo controls.
 
@@ -39,8 +32,7 @@ Kokoro-82M ships 54 official voices, but this backend's English text frontend (M
 `Sources/TTSBridgeCore/VoiceCatalog.swift` lists those 28 voices. Installed voices live in FluidAudio's cache outside the repo (`~/.cache/fluidaudio/Models/kokoro-82m-coreml/ANE/<voice>.bin`), so each machine installs its own. Install one from the Agentic Voice app's Settings, or:
 
 ```bash
-npm run bridge:voice -- af_bella
-# or: bridge/.build/release/TTSBridge install-voice af_bella
+bridge/.build/release/TTSBridge install-voice af_bella
 ```
 
 No Python or torch is needed: a Kokoro `.pt` voice file is an uncompressed zip, and the raw tensor bytes at `<voice>/data/0` are already byte-identical (little-endian float32, flat `[510,256]`) to what FluidAudio reads. The installer downloads the official file from `hexgrad/Kokoro-82M`, extracts that entry with `/usr/bin/unzip`, checks it is exactly 522,240 bytes, and writes it atomically to the cache path.

@@ -4,6 +4,6 @@
   "description": "Voice notifications for coding agents: speaks turn summaries and questions, and when a permission prompt needs your input.",
   "author": { "name": "Maxim Anatsko", "email": "max@maxanatsko.com" },
   "mcpServers": {
-    "agentic-voice": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/dist/src/server.js"] }
+    "agentic-voice": { "command": "${CLAUDE_PLUGIN_ROOT}/bridge/.build/release/agentic-voice", "args": ["mcp"] }
   }
 }

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository provides a minimal local voice-output capability for coding agents, speaking through a local TTS backend over a fixed HTTP contract. The bundled backend (`bridge/`) wraps Kokoro-82M via FluidAudio; it is not an NVIDIA product. A macOS menu bar app (`bridge/Sources/AgenticVoice/`) hosts that backend and offers settings, voice downloads and client installation.
+This repository provides a minimal local voice-output capability for coding agents, speaking through a local TTS backend over a fixed HTTP contract. Everything is one Swift package in `bridge/`: the `agentic-voice` command (MCP server, CLI, client installer), the bundled backend `TTSBridge`, which wraps Kokoro-82M via FluidAudio (not an NVIDIA product), and a macOS menu bar app (`bridge/Sources/AgenticVoice/`) that hosts that backend and offers settings, voice downloads and client installation. The only non-Swift code is the hook script (`hooks/`) and the opencode plugin shim (`opencode/`, plus the dependency-free `package.json` opencode needs to install it).
 
 ## Engineering principles
 
@@ -13,14 +13,14 @@ Keep boundaries explicit:
 - MCP code handles MCP concerns only.
 - CLI code handles process input/output only.
 - `VoiceService` owns the speak use case and user-facing speech policy.
-- TTS backend HTTP details stay inside the TTS client (`src/tts/tts-client.ts`).
-- Audio playback stays inside the audio module.
-- Configuration parsing stays in `config.ts`.
-- `bridge/` is a separate Swift package with its own toolchain; Node code must depend on it only through the documented HTTP contract, never by assuming its internals.
-- In `bridge/`, `TTSBridgeCore` owns the HTTP routes, model preparation and voice installation; the `TTSBridge` executable and the app only run it.
-- The macOS app is presentation only. It hosts `TTSBridgeCore`, writes the shared settings file, and runs the bundled Node scripts (`install-clients`, the CLI for previews) on the Node runtime it bundles; it never edits client files or calls the TTS backend itself.
-- Client config editing stays in `src/clients/` (pure text edits in `config-edit.ts`, file handling in `clients.ts`).
-- `~/Library/Application Support/AgenticVoice/config.json` is the only persisted setting. `config.ts` defines its format; the app reads and writes only `voice` and `speed`, applying the same rules. The app speaks (voice preview) only through the bundled CLI, never by calling the synthesis endpoint itself; its only HTTP request is the health check in the bridge startup protocol.
+- TTS backend HTTP details stay inside the TTS client (`AgenticVoiceKit/TTSClient.swift`).
+- Audio playback stays inside `AudioPlayer`.
+- Configuration parsing stays in `Config.swift`.
+- `TTSBridgeCore` owns the HTTP routes, model preparation and voice installation; the `TTSBridge` executable and the app only run it.
+- `AgenticVoiceKit` depends on the bridge only through the documented HTTP contract, never by importing `TTSBridgeCore` (keep Vapor and FluidAudio out of it). The `agentic-voice` command (`AgenticVoiceCLI`) and the app share it.
+- The macOS app is presentation only. It hosts `TTSBridgeCore`, writes the shared settings file, and calls `AgenticVoiceKit` for client installation and voice previews; it never edits client files or calls the TTS backend itself.
+- Client config editing stays in `AgenticVoiceKit/Clients/` (pure text edits in `ConfigEdit.swift`, file handling in `Clients.swift`).
+- `~/Library/Application Support/AgenticVoice/config.json` is the only persisted setting. `Config.swift` defines its format; the app reads and writes only `voice` and `speed`, applying the same rules. The app speaks (voice preview) only through `VoiceService`, never by calling the synthesis endpoint itself; its only direct HTTP request is the health check in the bridge startup protocol.
 
 Do not let transport-specific objects leak into application code.
 
@@ -45,14 +45,14 @@ Do not create generic helpers solely to remove two or three similar lines.
 
 ## Code conventions
 
-- TypeScript, ESM, strict mode, Node 26+.
-- Prefer the Node.js standard library over dependencies.
+- Swift 6 language mode, macOS 26+.
+- Prefer Foundation and the standard library over dependencies.
 - Validate external input at boundaries.
 - Keep functions small and intention-revealing.
 - Fail with actionable error messages; do not silently swallow synthesis or playback failures.
 - Never write diagnostic output to stdout from the MCP process. stdout is reserved for MCP protocol traffic; use stderr for diagnostics.
 - Tests should focus on deterministic application behavior. Do not mock implementation details merely to increase coverage.
-- Swift code in `bridge/` is not built or tested by the root `tsc`/`node --test` pipeline — verify it with `swift build -c release --package-path bridge` and `npm run app:build` (see `bridge/README.md`).
+- Verify with `swift build -c release --package-path bridge`, `swift test --package-path bridge` and, for app changes, `scripts/build-app.sh` (see `bridge/README.md`).
 
 ## Change checklist
 

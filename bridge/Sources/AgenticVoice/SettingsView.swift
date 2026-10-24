@@ -1,3 +1,4 @@
+import AgenticVoiceKit
 import AppKit
 import SwiftUI
 import TTSBridgeCore

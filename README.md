@@ -2,7 +2,7 @@
 
 Local voice output for coding agents, backed by a local TTS bridge. The default backend ([`bridge/`](bridge/README.md)) runs Kokoro-82M — an open TTS model by [hexgrad](https://huggingface.co/hexgrad/Kokoro-82M), unrelated to NVIDIA — via [FluidAudio](https://github.com/FluidInference/FluidAudio)'s Apple Neural Engine runtime, entirely on-device.
 
-The MVP exposes a single MCP tool, `speak`, and a small CLI. Both paths share the same application service, so agent-triggered speech and deterministic lifecycle hooks do not duplicate TTS or playback logic.
+The MVP exposes a single MCP tool, `speak`, and a small CLI, both in one Swift command, `agentic-voice`. Both paths share the same application service, so agent-triggered speech and deterministic lifecycle hooks do not duplicate TTS or playback logic.
 
 ## Goals
 
@@ -30,28 +30,27 @@ Agent / lifecycle hook
            /            \
      TTS client        Audio player
           |                 |
- POST /v1/audio/synthesize  afplay/aplay/custom command
+ POST /v1/audio/synthesize  afplay/custom command
 ```
 
 The HTTP endpoint above is served locally by the bundled [`bridge/`](bridge/README.md) by default; any HTTP service implementing the same contract (see "TTS HTTP contract" below) works.
 
-Responsibilities are intentionally narrow:
+Responsibilities are intentionally narrow. The command is in `bridge/Sources/AgenticVoiceCLI/`, everything it runs in the `AgenticVoiceKit` library (`bridge/Sources/AgenticVoiceKit/`), which the macOS app shares:
 
-- `src/server.ts` — MCP boundary and startup/shutdown wiring.
-- `src/cli.ts` — command-line boundary only.
-- `src/voice/voice-service.ts` — use-case orchestration and speech-length policy.
-- `src/tts/tts-client.ts` — TTS HTTP client only.
-- `src/tts/bridge-process.ts` — readiness and ownership of the separate bridge process.
-- `src/audio/audio-player.ts` — local playback only.
-- `src/config.ts` — configuration (environment, `.env`, settings file) only.
-- `src/install-clients.ts` and `src/clients/` — writing agentic-voice entries into client config files only.
+- `MCPServer.swift` (CLI) — MCP boundary and startup/shutdown wiring, on the official [MCP Swift SDK](https://github.com/modelcontextprotocol/swift-sdk).
+- `Speak.swift` and `InstallClients.swift` (CLI) — command-line boundaries only.
+- `VoiceService.swift` — use-case orchestration and speech-length policy.
+- `TTSClient.swift` — TTS HTTP client only.
+- `BridgeProcess.swift` — readiness and ownership of the separate bridge process.
+- `AudioPlayer.swift` — local playback and the speaking lock only.
+- `Config.swift` — configuration (environment, `.env`, settings file) only.
+- `Clients/` — writing agentic-voice entries into client config files only.
 
 ## Requirements
 
-- Node.js 26+
+- macOS 26+ on Apple Silicon with Xcode 26+ / Swift 6.2+ to build.
 - A built bundled bridge, or an externally managed TTS backend. MCP automatically starts the bundled bridge at `http://127.0.0.1:9000` when needed.
-- To build/run the bundled bridge: macOS 26+ on Apple Silicon with Xcode 26+ / Swift 6.2+.
-- A local WAV player: `afplay` on macOS or `aplay` on Linux, unless overridden.
+- A local WAV player: `afplay`, unless overridden.
 
 The TTS backend can run on a separate machine reachable over HTTP — set `TTS_URL` to that host.
 
@@ -61,11 +60,9 @@ The TTS backend can run on a separate machine reachable over HTTP — set `TTS_U
 cp .env.example .env
 ```
 
-Create `.env` in the plugin/repository root. MCP and CLI resolve it from their installed module location, independently of the calling project's working directory. Existing environment variables take precedence over `.env`.
+Create `.env` in the plugin/repository root. MCP and CLI resolve it from the location of the `agentic-voice` executable (`<root>/bridge/.build/release/agentic-voice`), independently of the calling project's working directory. Existing environment variables take precedence over `.env`.
 
 Voice and speed can also come from the shared settings file `~/Library/Application Support/AgenticVoice/config.json` (`{"voice": "af_bella", "speed": 1.1}`), which the Agentic Voice macOS app writes. Precedence: environment variables, then `.env`, then the settings file, then defaults. The MCP server re-reads voice and speed on every `speak` call, so changes apply without a restart; `TTS_URL` is fixed when MCP starts. A `.env` copied from an older `.env.example` sets `TTS_VOICE` and `VOICE_SPEED`, which hide the settings file; remove those lines to use it.
-
-Hooks run in the agent's environment, which may not include your shell's `PATH`. Set `AGENTIC_VOICE_NODE` to an absolute `node` path for `hooks/speak-notify.sh` if `node` is not found there.
 
 Environment variables:
 
@@ -81,14 +78,14 @@ Environment variables:
 ## Install and run
 
 ```bash
-npm run setup   # npm install + build the Node app + build the Swift bridge
-npm test
+swift build -c release --package-path bridge   # agentic-voice, TTSBridge and the app
+swift test --package-path bridge
 ```
 
 Run the MCP server over stdio:
 
 ```bash
-npm start
+bridge/.build/release/agentic-voice mcp
 ```
 
 MCP reuses a healthy bundled bridge or launches the already-built `bridge/.build/release/TTSBridge` as a separate process. No separate terminal is needed. Startup never installs dependencies or compiles code. The bridge's first model initialization can download missing FluidAudio assets; later starts reuse its cache. MCP initialization and tool listing remain available during initialization, and `speak` waits for readiness (up to five minutes). If the bridge fails to become ready, MCP stays connected and each `speak` call returns the startup error; restart MCP after fixing the cause. Bridge output and actionable startup failures go to stderr; stdout contains only MCP protocol messages.
@@ -101,32 +98,32 @@ MCP instances coordinate startup by exclusively binding `127.0.0.1:19000` before
 
 Only one session speaks at a time. Whichever agentic-voice process is speaking (MCP, CLI, or hook) holds an exclusive bind on `127.0.0.1:19001` from synthesis through playback; the OS releases it if that process exits. A request that arrives while the speaker is held is not queued: the `speak` tool returns a non-error "another session is speaking" result so the agent can skip or retry later, and the CLI prints the same message to stderr and exits with code 75. Keep port 19001 available.
 
-If the executable is missing, run `npm run setup` explicitly. If startup times out or model initialization fails, run `npm run bridge:start` to inspect diagnostics and finish first-use initialization, then restart MCP. If another service occupies port 9000, free the port or configure `TTS_URL` for your backend.
+If the executable is missing, build it as above. If startup times out or model initialization fails, run `bridge/.build/release/TTSBridge` to inspect diagnostics and finish first-use initialization, then restart MCP. If another service occupies port 9000, free the port or configure `TTS_URL` for your backend.
 
 The CLI and lifecycle hooks do not start the bridge. To try the CLI without an active MCP server, start a backend explicitly:
 
 ```bash
-npm run bridge:start
+bridge/.build/release/TTSBridge
 ```
 
 Try the CLI:
 
 ```bash
-npm run speak -- "Review complete. Two blocking issues need your attention."
+bridge/.build/release/agentic-voice speak "Review complete. Two blocking issues need your attention."
 ```
 
 Or pipe text from a hook:
 
 ```bash
-printf '%s' "The task finished successfully." | npm run speak
+printf '%s' "The task finished successfully." | bridge/.build/release/agentic-voice speak
 ```
 
 ## macOS app
 
-`Agentic Voice.app` is a menu bar app (no Dock icon) that keeps the voice engine running at `127.0.0.1:9000`, so MCP servers, the CLI and hooks always find a bridge to use, and none of them owns it. Build it from source on an Apple Silicon Mac running macOS 26+, with Node 26+ and Xcode 26+. The app itself bundles the official Node runtime (26.12.1, checksum-verified at build time), so people who only run the app don't need Node installed:
+`Agentic Voice.app` is a menu bar app (no Dock icon) that keeps the voice engine running at `127.0.0.1:9000`, so MCP servers, the CLI and hooks always find a bridge to use, and none of them owns it. Build it from source on an Apple Silicon Mac running macOS 26+ with Xcode 26+. It bundles the `agentic-voice` command, TTSBridge and the hooks, so it needs nothing else installed:
 
 ```bash
-npm run app:build   # → build/Agentic Voice.app (ad-hoc signed, not notarized)
+scripts/build-app.sh   # → build/Agentic Voice.app (ad-hoc signed, not notarized)
 ```
 
 Move it to `/Applications` and open it. On first run it downloads the model and the default voice, showing progress in the menu. It follows the same rules as MCP's bridge management: if a healthy bridge is already running it uses that one and takes over when it goes away, and it takes the `127.0.0.1:19000` startup lock so only one process loads the model. The menu offers Settings, Launch at Login and Quit. Quitting stops the engine; MCP servers that were using it can't speak until they restart.
@@ -134,12 +131,12 @@ Move it to `/Applications` and open it. On first run it downloads the model and 
 Settings has three tabs:
 
 - **General**: the default voice and speed, saved to the shared settings file and applied on every agent's next spoken message. Also shows the voice engine's status.
-- **Voices**: install, preview or delete any of the 28 English voices. Preview speaks through the bundled CLI, the same path agents use, so it takes the same speaking lock and never talks over them.
-- **Clients**: install, update or uninstall agentic-voice in each client by running the bundled `install-clients` (see below) on the bundled Node, with your login shell's `PATH` so it can find `claude`. Client entries and hooks point at the bundled Node, so they show as outdated if you move the app; Update fixes them.
+- **Voices**: install, preview or delete any of the 28 English voices. Preview speaks through the same `VoiceService` agents use, so it takes the same speaking lock and never talks over them.
+- **Clients**: install, update or uninstall agentic-voice in each client with the same installer as `agentic-voice clients` (see below), using your login shell's `PATH` so it can find `claude`. Client entries and hooks point at the bundled `agentic-voice` command, so they show as outdated if you move the app (or if they were written by an older, Node-based version); Update fixes them.
 
 ## Install into clients
 
-`npm run clients -- <install|uninstall> <client...>` adds or removes the `agentic-voice` MCP server, and the input-needed hook where the client supports one, in each client's user-level config. The Agentic Voice macOS app runs the same command. Entries use absolute paths to the running `node` and to this checkout, so rerun `install` after moving either; `status` reports such entries as not `current`. Install and uninstall need the client names, so nothing is written to a client you did not pick; `npm run clients -- status [client...]` reports every client when none is named. Output is JSON, one object per client.
+`agentic-voice clients <install|uninstall> <client...>` adds or removes the `agentic-voice` MCP server, and the input-needed hook where the client supports one, in each client's user-level config. The Agentic Voice macOS app runs the same command. Entries use the absolute path of the `agentic-voice` executable that ran the installer and of this checkout's hooks, so rerun `install` after moving it; `status` reports such entries as not `current`. Install and uninstall need the client names, so nothing is written to a client you did not pick; `agentic-voice clients status [client...]` reports every client when none is named. Output is JSON, one object per client.
 
 | Client | MCP entry | Hook |
 | --- | --- | --- |
@@ -151,17 +148,17 @@ Settings has three tabs:
 | `windsurf` | `~/.codeium/windsurf/mcp_config.json` | — |
 | `opencode` | `~/.config/opencode/opencode.json` | plugin shim in `~/.config/opencode/plugins/` |
 
-Other entries are kept. The first change to an existing file saves the original next to it as `<file>.agentic-voice-backup`. A file that isn't plain JSON (for example, one with comments) is left unchanged, and the error shows the entry to add by hand. Restart a client after installing. Don't combine this with the agentic-voice plugin in the same client, or it will speak twice.
+Other entries are kept. The first change to an existing file saves the original next to it as `<file>.agentic-voice-backup`. A file that isn't plain JSON (for example, one with comments) is left unchanged, and the error shows the entry to add by hand. Edited JSON files are written back pretty-printed with their keys sorted; their contents are otherwise unchanged. Restart a client after installing. Don't combine this with the agentic-voice plugin in the same client, or it will speak twice.
 
 ## TTS bridge (`bridge/`)
 
 The bundled backend is a small Swift package (Vapor HTTP server + FluidAudio's Kokoro-ANE CoreML runtime) that implements the exact HTTP contract this repo's client speaks — see [`bridge/README.md`](bridge/README.md) for voice roster, the voice-conversion script, and model cache details.
 
-Build/run it via the root npm scripts:
+Build and run it:
 
 ```bash
-npm run bridge:build
-npm run bridge:start
+swift build -c release --package-path bridge --product TTSBridge
+bridge/.build/release/TTSBridge
 ```
 
 ## MCP tool
@@ -176,7 +173,7 @@ If another session is already speaking, `speak` returns `Not spoken: another age
 
 `kind` is optional metadata: `question`, `completion`, `alert`, or `custom`. It currently does not change synthesis behavior; keeping it in the contract leaves room for small policy changes without creating separate tools.
 
-The server sends MCP `instructions` telling the agent when to speak: a one- or two-sentence summary when it finishes a turn of work, the question itself when it needs input (in addition to showing it as text), and blockers. Spoken text is written for listening, never code, paths, or logs. See `instructions` in [`src/server.ts`](src/server.ts).
+The server sends MCP `instructions` telling the agent when to speak: a one- or two-sentence summary when it finishes a turn of work, the question itself when it needs input (in addition to showing it as text), and blockers. Spoken text is written for listening, never code, paths, or logs. See `instructions` in [`MCPServer.swift`](bridge/Sources/AgenticVoiceCLI/MCPServer.swift).
 
 ## Lifecycle hooks
 
@@ -209,7 +206,7 @@ codex plugin add agentic-voice@agentic-voice
 
 Check it loaded cleanly: `claude plugin details agentic-voice` / `codex plugin list --json`. To remove: `claude plugin uninstall agentic-voice && claude plugin marketplace remove agentic-voice`, `codex plugin remove agentic-voice@agentic-voice && codex plugin marketplace remove agentic-voice`.
 
-Both the Claude Code and Codex plugins register the stdio MCP server as well as hooks. After installation, run setup in the installed plugin copy if its build artifacts are missing, then reload Codex so it loads the new manifest and built files. Codex can omit the Swift `.build` directory when copying a local plugin, even if you already built the source checkout. The `speak` tool then becomes available and MCP manages the local bridge. For Claude Code, run the same setup in the installed copy (`~/.claude/plugins/cache/agentic-voice/agentic-voice/<version>`) after installing or updating.
+Both the Claude Code and Codex plugins register the stdio MCP server as well as hooks. After installation, build the installed plugin copy (`swift build -c release --package-path bridge` there) if its build artifacts are missing, then reload Codex so it loads the new manifest and built files. Codex can omit the Swift `.build` directory when copying a local plugin, even if you already built the source checkout. The `speak` tool then becomes available and MCP manages the local bridge. For Claude Code, run the same build in the installed copy (`~/.claude/plugins/cache/agentic-voice/agentic-voice/<version>`) after installing or updating.
 
 For an existing installation from this local marketplace, reinstall:
 
@@ -218,7 +215,7 @@ codex plugin remove agentic-voice@agentic-voice
 codex plugin add agentic-voice@agentic-voice --json
 ```
 
-The JSON result includes `installedPath`. Run `npm run setup --prefix /absolute/installedPath` using that value to install dependencies and build both components in the installed copy. This is an explicit installation step, not MCP startup behavior. Repeat it after reinstalling if the build artifacts were omitted. Then reload Codex. Check startup stderr if the tool fails to load or speak.
+The JSON result includes `installedPath`. Run `swift build -c release --package-path /absolute/installedPath/bridge` using that value to build the installed copy. This is an explicit installation step, not MCP startup behavior. Repeat it after reinstalling if the build artifacts were omitted. Then reload Codex. Check startup stderr if the tool fails to load or speak.
 
 **opencode** — `opencode plugin` installs directly from a GitHub `owner/repo` spec, no npm publish or local clone required:
 
@@ -232,7 +229,7 @@ To remove, delete the `"maxanatsko/agentic-voice"` entry opencode added to your 
 
 Copy the `hooks` object out of `hooks/hooks.json` into `~/.claude/settings.json` (deep-merge alongside any existing keys, never a wholesale replace) or a project's `.codex/hooks.json`, replacing `${CLAUDE_PLUGIN_ROOT}` with this repo's absolute path — that variable is only substituted for plugin-loaded hooks.
 
-**Prerequisites**: `npm run build` (so `dist/src/cli.js` exists) and the bridge running (`npm run bridge:start`).
+**Prerequisites**: `swift build -c release --package-path bridge` (so `bridge/.build/release/agentic-voice` exists) and the bridge running (`bridge/.build/release/TTSBridge`, or the app).
 
 An active MCP-owned bridge can also serve hooks. The hook script currently redirects output and suppresses errors with `|| true`, so hook failures are silent; MCP startup diagnostics remain visible on stderr.
 

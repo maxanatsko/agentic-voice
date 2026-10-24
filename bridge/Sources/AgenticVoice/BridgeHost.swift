@@ -1,10 +1,11 @@
+import AgenticVoiceKit
 import AppKit
 import Foundation
 import TTSBridgeCore
 import Vapor
 
-/// Serves the bridge on 127.0.0.1:9000 from inside the app, following the same protocol as the
-/// Node MCP server's BridgeProcess: reuse a healthy bridge, otherwise take the startup lock,
+/// Serves the bridge on 127.0.0.1:9000 from inside the app, following the same protocol as
+/// AgenticVoiceKit's BridgeProcess: reuse a healthy bridge, otherwise take the startup lock,
 /// prepare the model and serve, holding the lock while serving.
 @MainActor
 final class BridgeHost: ObservableObject {
@@ -59,7 +60,7 @@ final class BridgeHost: ObservableObject {
                 try? await Task.sleep(for: .seconds(5))
                 continue
             }
-            guard let lock = PortLock.acquire(PortLock.bridgeStartup) else {
+            guard let lock = try? PortLock.acquire(PortLock.bridgeStartup) else {
                 state = .waiting
                 try? await Task.sleep(for: .seconds(1))
                 continue
