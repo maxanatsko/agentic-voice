@@ -10,7 +10,7 @@ enum AppSettingsError: Error, LocalizedError {
     }
 }
 
-/// The shared settings file; the Node side's src/config.ts reads it on every speak call.
+/// The shared settings file; `AgenticVoiceKit`'s Config.swift reads it on every speak call.
 struct AppSettings: Codable, Equatable {
     var voice: String?
     var speed: Double?
@@ -38,8 +38,8 @@ struct AppSettings: Codable, Equatable {
             .appendingPathComponent("Library/Application Support/AgenticVoice/config.json")
     }
 
-    /// Applies src/config.ts's rules for the two keys the app edits, so it never shows or writes
-    /// back a value the Node side would reject.
+    /// Applies Config.swift's rules for the two keys the app edits, so it never shows or writes
+    /// back a value the speak path would reject.
     static func load() throws -> AppSettings {
         guard FileManager.default.fileExists(atPath: url.path) else { return AppSettings() }
         let settings: AppSettings

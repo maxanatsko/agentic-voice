@@ -86,7 +86,7 @@ public enum Config {
             voice: value("TTS_VOICE") ?? settings.voice ?? "am_michael",
             language: value("TTS_LANGUAGE") ?? "en-US",
             speed: try positiveNumber(environment["VOICE_SPEED"]) ?? settings.speed ?? 1.0,
-            maxChars: try positiveInteger(environment["VOICE_MAX_CHARS"]) ?? 360,
+            maxChars: try positiveInteger(environment["VOICE_MAX_CHARS"]) ?? 1200,
             playbackCommand: value("VOICE_PLAYBACK_COMMAND")
         )
     }

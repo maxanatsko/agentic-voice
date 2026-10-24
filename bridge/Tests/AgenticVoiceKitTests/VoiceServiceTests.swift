@@ -16,6 +16,22 @@ struct VoiceServiceTests {
         #expect(error?.message.contains("Summarize before speaking") == true)
     }
 
+    @Test func keepsShortTextInOneChunk() {
+        #expect(VoiceService.chunk("Review complete. Two issues.", limit: 320) == ["Review complete. Two issues."])
+    }
+
+    @Test func packsSentencesIntoChunksWithinTheLimit() {
+        #expect(VoiceService.chunk("One two. Three four. Five six.", limit: 20) == ["One two. Three four.", "Five six."])
+    }
+
+    @Test func splitsALongSentenceBetweenWords() {
+        #expect(VoiceService.chunk("alpha beta gamma delta epsilon zeta", limit: 12) == ["alpha beta", "gamma delta", "epsilon zeta"])
+    }
+
+    @Test func splitsAWordLongerThanTheLimit() {
+        #expect(VoiceService.chunk("go abcdefghijklmno", limit: 6) == ["go", "abcdef", "ghijkl", "mno"])
+    }
+
     /// A real TTS endpoint and a real player whose command blocks until the test lets it finish.
     final class Fixture: Sendable {
         let directory: TemporaryDirectory
@@ -40,11 +56,11 @@ struct VoiceServiceTests {
             self.directory = directory
         }
 
-        func voice() -> VoiceService {
+        func voice(maxChars: Int = 100) -> VoiceService {
             VoiceService(
                 tts: TTSClient(baseURL: tts.url, voice: "am_michael", language: "en-US", speed: 1),
                 player: AudioPlayer(command: player, lockPort: lockPort),
-                maxChars: 100
+                maxChars: maxChars
             )
         }
 
@@ -63,6 +79,15 @@ struct VoiceServiceTests {
         #expect(try await first.value == .spoken)
         #expect(try await fixture.voice().speak("Third message.") == .spoken)
         #expect(fixture.synthesized.value == 2)
+    }
+
+    @Test func synthesizesEveryChunkOfLongText() async throws {
+        let fixture = try await Fixture()
+        try fixture.finish()
+        let sentence = String(repeating: "word ", count: 40) + "end."
+        let text = Array(repeating: sentence, count: 3).joined(separator: " ")
+        #expect(try await fixture.voice(maxChars: 1200).speak(text) == .spoken)
+        #expect(fixture.synthesized.value == 3)
     }
 
     @Test func releasesTheSpeakerAfterAPlaybackFailure() async throws {
