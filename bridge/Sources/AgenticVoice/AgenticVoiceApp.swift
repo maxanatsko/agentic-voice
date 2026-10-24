@@ -4,48 +4,42 @@ import SwiftUI
 @main
 struct AgenticVoiceApp: App {
     @StateObject private var host: BridgeHost
+    /// Shared by Settings and onboarding, so the two windows never disagree.
+    @StateObject private var model: SettingsModel
 
     init() {
         let host = BridgeHost()
+        let model = SettingsModel(host: host)
         _host = StateObject(wrappedValue: host)
+        _model = StateObject(wrappedValue: model)
         host.start()
+        // No settings file yet means nobody has set the app up; finishing onboarding writes one.
+        if !FileManager.default.fileExists(atPath: AppSettings.url.path) {
+            Task { @MainActor in OnboardingWindow.show(model: model) }
+        }
     }
 
     var body: some Scene {
         MenuBarExtra("Agentic Voice", systemImage: "waveform") {
-            MenuContent(host: host)
+            MenuContent(host: host, model: model)
         }
     }
 }
 
 struct MenuContent: View {
     @ObservedObject var host: BridgeHost
-    @State private var launchAtLogin = LoginItem.isEnabled
-    @State private var loginItemError: String?
+    let model: SettingsModel
 
     var body: some View {
         Text(host.state.summary)
         if case .failed = host.state {
             Button("Retry", systemImage: "arrow.clockwise") { host.start() }
         }
-        if let loginItemError {
-            Text(loginItemError)
-        }
         Divider()
-        Button("Settings…", systemImage: "gearshape") { SettingsWindow.show(host: host) }
+        Button("Settings…", systemImage: "gearshape") { SettingsWindow.show(model: model) }
             .keyboardShortcut(",")
-        Toggle("Launch at Login", isOn: $launchAtLogin)
-            .onChange(of: launchAtLogin) { _, enabled in
-                // Resetting the toggle after a failure lands here too; there is nothing to change then.
-                guard enabled != LoginItem.isEnabled else { return }
-                do {
-                    try LoginItem.set(enabled)
-                    loginItemError = nil
-                } catch {
-                    loginItemError = "Launch at login: \(error.localizedDescription)"
-                    launchAtLogin = LoginItem.isEnabled
-                }
-            }
+        Button("Welcome…", systemImage: "hand.wave") { OnboardingWindow.show(model: model) }
+        LaunchAtLoginToggle()
         Divider()
         Button("Quit Agentic Voice", systemImage: "power") {
             Task {

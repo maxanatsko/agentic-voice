@@ -27,11 +27,10 @@ final class SettingsModel: ObservableObject {
     var selectedVoice: String { settings.voice ?? VoiceCatalog.defaultVoice }
     var speed: Double { settings.speed ?? 1.0 }
 
-    /// Cloned and installed voices, plus the selected one even when it's missing, so a picker can
-    /// say why speech fails.
-    var voiceChoices: [Voice] {
+    /// Cloned and installed voices, plus `id` even when it's missing.
+    func voiceChoices(including id: String) -> [Voice] {
         let choices = clonedVoices + VoiceCatalog.voices.filter { installedVoices.contains($0.id) }
-        return choices.contains { $0.id == selectedVoice } ? choices : choices + [Voice(id: selectedVoice)]
+        return choices.contains { $0.id == id } ? choices : choices + [Voice(id: id)]
     }
 
     func isInstalled(_ voice: Voice) -> Bool {
@@ -71,8 +70,15 @@ final class SettingsModel: ObservableObject {
         save { $0.speed = rounded }
     }
 
+    /// Saves the voice chosen in onboarding, even when it's the default, so the settings file
+    /// exists and the app no longer opens onboarding. Returns whether it was saved.
+    func finishOnboarding(voice: String) -> Bool {
+        save { $0.voice = voice }
+    }
+
     /// Publishes the change only once it's on disk, so the window never shows a value agents don't use.
-    private func save(_ change: (inout AppSettings) -> Void) {
+    @discardableResult
+    private func save(_ change: (inout AppSettings) -> Void) -> Bool {
         if unreadableSettings != nil {
             // The user may have fixed or deleted the file since; apply the change to what's there now.
             do {
@@ -81,7 +87,7 @@ final class SettingsModel: ObservableObject {
             } catch {
                 unreadableSettings = error.localizedDescription
                 message = "Not saved, so the existing file isn't replaced. \(error.localizedDescription)"
-                return
+                return false
             }
         }
         var next = settings
@@ -89,8 +95,10 @@ final class SettingsModel: ObservableObject {
         do {
             try next.save()
             settings = next
+            return true
         } catch {
             message = "Couldn't save settings: \(error.localizedDescription)"
+            return false
         }
     }
 
@@ -112,13 +120,14 @@ final class SettingsModel: ObservableObject {
         refreshVoices()
     }
 
-    /// Clones the sample and selects the new voice. Throws so the clone sheet can show why it failed.
-    func cloneVoice(name: String, from sample: URL) async throws {
+    /// Clones the sample and returns the new voice's id, leaving selecting it to the caller.
+    /// Throws so the clone sheet can show why it failed.
+    func cloneVoice(name: String, from sample: URL) async throws -> String {
         cloning = true
         defer { cloning = false }
         let id = try await ClonedVoiceStore.clone(name: name, from: sample)
         refreshVoices()
-        select(voice: id)
+        return id
     }
 
     func remove(_ voice: Voice) {

@@ -2,10 +2,10 @@ import SwiftUI
 import TTSBridgeCore
 import UniformTypeIdentifiers
 
-/// Records or picks a voice sample and clones it. `onDone` runs after a clone or on Cancel.
+/// Records or picks a voice sample and clones it. `onDone` gets the new voice's id, or nil on Cancel.
 struct CloneVoiceView: View {
     @ObservedObject var model: SettingsModel
-    let onDone: () -> Void
+    let onDone: (String?) -> Void
     @StateObject private var recorder = VoiceRecorder()
     @State private var chosenFile: URL?
     @State private var name = ""
@@ -74,7 +74,7 @@ struct CloneVoiceView: View {
                     Text("Cloning…").foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Cancel", role: .cancel) { finish() }
+                Button("Cancel", role: .cancel) { finish(nil) }
                     .keyboardShortcut(.cancelAction)
                 Button("Clone Voice") { Task { await clone() } }
                     .keyboardShortcut(.defaultAction)
@@ -99,15 +99,14 @@ struct CloneVoiceView: View {
         guard let sample else { return }
         error = nil
         do {
-            try await model.cloneVoice(name: name, from: sample)
-            finish()
+            finish(try await model.cloneVoice(name: name, from: sample))
         } catch {
             self.error = error.localizedDescription
         }
     }
 
-    private func finish() {
+    private func finish(_ id: String?) {
         recorder.discard()
-        onDone()
+        onDone(id)
     }
 }

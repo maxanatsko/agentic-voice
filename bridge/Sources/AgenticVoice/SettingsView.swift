@@ -8,12 +8,10 @@ import TTSBridgeCore
 @MainActor
 enum SettingsWindow {
     private static var window: NSWindow?
-    private static var model: SettingsModel?
 
-    static func show(host: BridgeHost) {
+    static func show(model: SettingsModel) {
         if window == nil {
-            let model = SettingsModel(host: host)
-            let controller = NSHostingController(rootView: SettingsView(model: model, host: host))
+            let controller = NSHostingController(rootView: SettingsView(model: model, host: model.host))
             // Lets the split view's sidebar run under the titlebar, as in System Settings.
             controller.sceneBridgingOptions = .all
             let window = NSWindow(contentViewController: controller)
@@ -25,10 +23,9 @@ enum SettingsWindow {
             window.setContentSize(NSSize(width: 720, height: 560))
             window.center()
             self.window = window
-            self.model = model
         }
         // Reread on every open: settings and clients may have changed from the terminal since.
-        if let model { Task { await model.load() } }
+        Task { await model.load() }
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }
@@ -144,11 +141,7 @@ struct GeneralTab: View {
     var body: some View {
         Group {
             Section {
-                Picker("Voice", selection: Binding(get: { model.selectedVoice }, set: { model.select(voice: $0) })) {
-                    ForEach(model.voiceChoices) { voice in
-                        Text(model.isInstalled(voice) ? "\(voice.name) — \(voice.accent)" : "\(voice.name) — not installed").tag(voice.id)
-                    }
-                }
+                VoicePicker(model: model, selection: Binding(get: { model.selectedVoice }, set: { model.select(voice: $0) }))
                 LabeledContent("Speed") {
                     HStack {
                         // Saved when the drag ends, not on every step.
@@ -184,6 +177,21 @@ struct GeneralTab: View {
                 } label: {
                     Label { Text(host.state.summary) } icon: { EngineStatusIcon(state: host.state) }
                 }
+            }
+        }
+    }
+}
+
+/// Cloned and installed voices. The selected voice stays listed when it's missing, so the picker
+/// says why speech fails.
+struct VoicePicker: View {
+    @ObservedObject var model: SettingsModel
+    @Binding var selection: String
+
+    var body: some View {
+        Picker("Voice", selection: $selection) {
+            ForEach(model.voiceChoices(including: selection)) { voice in
+                Text(model.isInstalled(voice) ? "\(voice.name) — \(voice.accent)" : "\(voice.name) — not installed").tag(voice.id)
             }
         }
     }
@@ -247,7 +255,10 @@ struct VoicesTab: View {
             }
         }
         .sheet(isPresented: $cloning) {
-            CloneVoiceView(model: model) { cloning = false }
+            CloneVoiceView(model: model) { id in
+                cloning = false
+                if let id { model.select(voice: id) }
+            }
                 .frame(width: 520, height: 620)
         }
     }

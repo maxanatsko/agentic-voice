@@ -126,7 +126,9 @@ printf '%s' "The task finished successfully." | bridge/.build/release/agentic-vo
 scripts/build-app.sh   # → build/Agentic Voice.app (ad-hoc signed, not notarized)
 ```
 
-Move it to `/Applications` and open it. On first run it downloads the model and the default voice, showing progress in the menu. It follows the same rules as MCP's bridge management: if a healthy bridge is already running it uses that one and takes over when it goes away, and it takes the `127.0.0.1:19000` startup lock so only one process loads the model. The menu offers Settings, Launch at Login and Quit. Quitting stops the engine; MCP servers that were using it can't speak until they restart.
+Move it to `/Applications` and open it. On first run it downloads the model and the default voice, showing progress in the menu. It follows the same rules as MCP's bridge management: if a healthy bridge is already running it uses that one and takes over when it goes away, and it takes the `127.0.0.1:19000` startup lock so only one process loads the model. The menu offers Settings, Welcome, Launch at Login and Quit.
+
+Until the shared settings file exists, the app opens a short onboarding window at launch: it shows the engine preparing, then lets you pick or clone a voice, install agentic-voice into your clients and turn on Launch at Login. Done saves your voice to the settings file, so onboarding doesn't open again; Welcome in the menu reopens it. Quitting stops the engine; MCP servers that were using it can't speak until they restart.
 
 Settings has three tabs:
 
