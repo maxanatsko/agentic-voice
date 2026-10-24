@@ -1,0 +1,81 @@
+# Builds "Agentic Voice.app" with scripts/build-app.sh and publishes it as a DMG on the
+# GitHub release for the pushed v* tag. The app is ad-hoc signed, not notarized.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release (e.g. v0.2.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Select Xcode 26
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -n 1)"
+          sudo xcode-select -s "$XCODE"
+          swift --version
+
+      - name: Check tag matches app version
+        run: |
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' bridge/AgenticVoice-Info.plist)"
+          if [ "v$VERSION" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match CFBundleShortVersionString $VERSION in bridge/AgenticVoice-Info.plist."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v4
+        with:
+          path: bridge/.build
+          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bridge/Package.resolved') }}
+          restore-keys: swiftpm-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Test
+        run: swift test --package-path bridge
+
+      - name: Build app
+        run: scripts/build-app.sh
+
+      - name: Build DMG
+        run: |
+          DMG="Agentic-Voice-$VERSION.dmg"
+          mkdir -p build/dmg
+          cp -R "build/Agentic Voice.app" build/dmg/
+          ln -s /Applications build/dmg/Applications
+          hdiutil create -volname "Agentic Voice" -srcfolder build/dmg -ov -format UDZO "build/$DMG"
+          (cd build && shasum -a 256 "$DMG" > "$DMG.sha256")
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > build/notes.md <<'NOTES'
+          Requires macOS 26+ on Apple Silicon.
+
+          **Install:** open the DMG and drag **Agentic Voice** to Applications. The app is ad-hoc signed and not notarized, so macOS blocks it the first time: open it once, then choose **Open Anyway** in System Settings → Privacy & Security. Or run:
+
+          ```bash
+          xattr -dr com.apple.quarantine "/Applications/Agentic Voice.app"
+          ```
+          NOTES
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" build/*.dmg build/*.dmg.sha256 --clobber
+          else
+            gh release create "$TAG" build/*.dmg build/*.dmg.sha256 \
+              --title "Agentic Voice $VERSION" --notes-file build/notes.md --generate-notes --verify-tag
+          fi
