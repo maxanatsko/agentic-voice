@@ -141,11 +141,7 @@ struct GeneralTab: View {
     var body: some View {
         Group {
             Section {
-                Picker("Voice", selection: Binding(get: { model.selectedVoice }, set: { model.select(voice: $0) })) {
-                    ForEach(model.voiceChoices) { voice in
-                        Text(model.isInstalled(voice) ? "\(voice.name) — \(voice.accent)" : "\(voice.name) — not installed").tag(voice.id)
-                    }
-                }
+                VoicePicker(model: model, selection: Binding(get: { model.selectedVoice }, set: { model.select(voice: $0) }))
                 LabeledContent("Speed") {
                     HStack {
                         // Saved when the drag ends, not on every step.
@@ -181,6 +177,21 @@ struct GeneralTab: View {
                 } label: {
                     Label { Text(host.state.summary) } icon: { EngineStatusIcon(state: host.state) }
                 }
+            }
+        }
+    }
+}
+
+/// Cloned and installed voices. The selected voice stays listed when it's missing, so the picker
+/// says why speech fails.
+struct VoicePicker: View {
+    @ObservedObject var model: SettingsModel
+    @Binding var selection: String
+
+    var body: some View {
+        Picker("Voice", selection: $selection) {
+            ForEach(model.voiceChoices(including: selection)) { voice in
+                Text(model.isInstalled(voice) ? "\(voice.name) — \(voice.accent)" : "\(voice.name) — not installed").tag(voice.id)
             }
         }
     }

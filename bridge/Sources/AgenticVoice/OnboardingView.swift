@@ -8,7 +8,8 @@ enum OnboardingWindow {
     private static var window: NSWindow?
 
     static func show(model: SettingsModel) {
-        if window == nil {
+        // A fresh view each time it reopens, so it starts over instead of offering an old choice.
+        if window?.isVisible != true {
             let controller = NSHostingController(rootView: OnboardingView(model: model, host: model.host) { OnboardingWindow.window?.close() })
             let window = NSWindow(contentViewController: controller)
             window.styleMask = [.titled, .closable, .fullSizeContentView]
@@ -92,11 +93,7 @@ struct OnboardingView: View {
                     }
                 case .voice:
                     Section {
-                        Picker("Voice", selection: Binding(get: { chosenVoice.id }, set: { voice = $0 })) {
-                            ForEach(model.voiceChoices) { choice in
-                                Text(model.isInstalled(choice) ? "\(choice.name) — \(choice.accent)" : "\(choice.name) — not installed").tag(choice.id)
-                            }
-                        }
+                        VoicePicker(model: model, selection: Binding(get: { chosenVoice.id }, set: { voice = $0 }))
                         LabeledContent("Hear it") {
                             Button("Preview", systemImage: "play.fill") { Task { await model.play(chosenVoice) } }
                                 .disabled(!model.engineReady || model.previewing || !model.isInstalled(chosenVoice))

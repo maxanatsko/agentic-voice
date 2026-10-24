@@ -27,11 +27,10 @@ final class SettingsModel: ObservableObject {
     var selectedVoice: String { settings.voice ?? VoiceCatalog.defaultVoice }
     var speed: Double { settings.speed ?? 1.0 }
 
-    /// Cloned and installed voices, plus the selected one even when it's missing, so a picker can
-    /// say why speech fails.
-    var voiceChoices: [Voice] {
+    /// Cloned and installed voices, plus `id` even when it's missing.
+    func voiceChoices(including id: String) -> [Voice] {
         let choices = clonedVoices + VoiceCatalog.voices.filter { installedVoices.contains($0.id) }
-        return choices.contains { $0.id == selectedVoice } ? choices : choices + [Voice(id: selectedVoice)]
+        return choices.contains { $0.id == id } ? choices : choices + [Voice(id: id)]
     }
 
     func isInstalled(_ voice: Voice) -> Bool {
