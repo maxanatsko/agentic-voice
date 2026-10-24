@@ -43,6 +43,12 @@ struct ConfigTests {
         #expect(values == ["TTS_URL": "http://host:9000", "TTS_VOICE": "af_bella", "VOICE_SPEED": "1.2"])
     }
 
+    @Test func dotEnvStripsInlineComments() throws {
+        let values = Config.parseDotEnv("VOICE_SPEED=1.2 # faster\nTTS_URL=http://host:9000#remote\nTTS_VOICE=\"af # bella\" # quoted\nTTS_LANGUAGE='en-US'# uk later\n")
+        #expect(values == ["VOICE_SPEED": "1.2", "TTS_URL": "http://host:9000", "TTS_VOICE": "af # bella", "TTS_LANGUAGE": "en-US"])
+        #expect(try Config.load(environment: values, settings: Settings()).speed == 1.2)
+    }
+
     @Test func onlyTheBundledLoopbackEndpointIsManaged() {
         for url in ["http://127.0.0.1:9000", "http://localhost:9000/", "http://[::1]:9000"] {
             #expect(Config.isBundledTTSURL(url), "\(url)")

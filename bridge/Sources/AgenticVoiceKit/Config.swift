@@ -91,7 +91,8 @@ public enum Config {
         )
     }
 
-    /// Parses `.env` text: `KEY=VALUE` lines, `#` comments, optionally quoted values.
+    /// Parses `.env` text: `KEY=VALUE` lines and `#` comments, including a comment after an
+    /// unquoted value or after a quoted value's closing quote, as Node's loader does.
     public static func parseDotEnv(_ text: String) -> [String: String] {
         var values: [String: String] = [:]
         for line in text.split(whereSeparator: \.isNewline) {
@@ -99,9 +100,13 @@ public enum Config {
             if line.hasPrefix("export ") { line = String(line.dropFirst(7)) }
             guard !line.hasPrefix("#"), let equals = line.firstIndex(of: "=") else { continue }
             let key = line[..<equals].trimmingCharacters(in: .whitespaces)
-            var value = line[line.index(after: equals)...].trimmingCharacters(in: .whitespaces)
-            if value.count >= 2, let quote = value.first, quote == "\"" || quote == "'", value.last == quote {
-                value = String(value.dropFirst().dropLast())
+            let raw = line[line.index(after: equals)...].trimmingCharacters(in: .whitespaces)
+            let value: String
+            if let quote = raw.first, quote == "\"" || quote == "'",
+               let close = raw.dropFirst().firstIndex(of: quote) {
+                value = String(raw[raw.index(after: raw.startIndex)..<close])
+            } else {
+                value = String(raw.prefix { $0 != "#" }).trimmingCharacters(in: .whitespaces)
             }
             if !key.isEmpty { values[key] = value }
         }
