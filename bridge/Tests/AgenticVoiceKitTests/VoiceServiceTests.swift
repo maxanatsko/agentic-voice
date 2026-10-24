@@ -28,6 +28,10 @@ struct VoiceServiceTests {
         #expect(VoiceService.chunk("alpha beta gamma delta epsilon zeta", limit: 12) == ["alpha beta", "gamma delta", "epsilon zeta"])
     }
 
+    @Test func splitsAWordLongerThanTheLimit() {
+        #expect(VoiceService.chunk("go abcdefghijklmno", limit: 6) == ["go", "abcdef", "ghijkl", "mno"])
+    }
+
     /// A real TTS endpoint and a real player whose command blocks until the test lets it finish.
     final class Fixture: Sendable {
         let directory: TemporaryDirectory
