@@ -120,7 +120,13 @@ printf '%s' "The task finished successfully." | bridge/.build/release/agentic-vo
 
 ## macOS app
 
-`Agentic Voice.app` is a menu bar app (no Dock icon) that keeps the voice engine running at `127.0.0.1:9000`, so MCP servers, the CLI and hooks always find a bridge to use, and none of them owns it. Build it from source on an Apple Silicon Mac running macOS 26+ with Xcode 26+. It bundles the `agentic-voice` command, TTSBridge and the hooks, so it needs nothing else installed:
+`Agentic Voice.app` is a menu bar app (no Dock icon) that keeps the voice engine running at `127.0.0.1:9000`, so MCP servers, the CLI and hooks always find a bridge to use, and none of them owns it. It bundles the `agentic-voice` command, TTSBridge and the hooks, so it needs nothing else installed.
+
+Download `Agentic-Voice-<version>.dmg` from the [latest release](https://github.com/maxanatsko/agentic-voice/releases/latest) (macOS 26+, Apple Silicon) and drag the app to Applications. It is ad-hoc signed and not notarized, so macOS blocks the first launch: open it once, then choose Open Anyway in System Settings → Privacy & Security, or run `xattr -dr com.apple.quarantine "/Applications/Agentic Voice.app"`.
+
+To publish a release, bump the version in `bridge/AgenticVoice-Info.plist` (`CFBundleShortVersionString`), `package.json`, `.claude-plugin/` and `.codex-plugin/`, then push a matching tag: `git tag v0.3.0 && git push origin v0.3.0`. The [release workflow](.github/workflows/release.yml) tests, builds the app with `scripts/build-app.sh` and attaches the DMG to the release; it fails if the tag doesn't match the app's version.
+
+Or build it from source on an Apple Silicon Mac running macOS 26+ with Xcode 26+:
 
 ```bash
 scripts/build-app.sh   # → build/Agentic Voice.app (ad-hoc signed, not notarized)
