@@ -1,0 +1,31 @@
+# Tests the Swift package and builds "Agentic Voice.app" on every pull request and push to main.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -n 1)"
+          sudo xcode-select -s "$XCODE"
+          swift --version
+
+      - uses: actions/cache@v4
+        with:
+          path: bridge/.build
+          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bridge/Package.resolved') }}
+          restore-keys: swiftpm-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Test
+        run: swift test --package-path bridge
+
+      - name: Build app
+        run: scripts/build-app.sh

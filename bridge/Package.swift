@@ -42,10 +42,16 @@ let package = Package(
                 .product(name: "MCP", package: "swift-sdk")
             ]
         ),
+        // Thinking-orbs geometry (MIT, libraries.dev/orbs), copied unchanged from visual-explainer's
+        // VECore/OrbEngine.swift, so it keeps that code's Swift 5 language mode.
+        .target(
+            name: "OrbKit",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         // The menu bar app; scripts/build-app.sh wraps it in "Agentic Voice.app".
         .executableTarget(
             name: "AgenticVoice",
-            dependencies: ["TTSBridgeCore", "AgenticVoiceKit"]
+            dependencies: ["TTSBridgeCore", "AgenticVoiceKit", "OrbKit"]
         ),
         .testTarget(
             name: "AgenticVoiceKitTests",
@@ -54,6 +60,11 @@ let package = Package(
         .testTarget(
             name: "TTSBridgeCoreTests",
             dependencies: ["TTSBridgeCore"]
+        ),
+        .testTarget(
+            name: "OrbKitTests",
+            dependencies: ["OrbKit"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]
 )

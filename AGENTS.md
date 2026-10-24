@@ -20,7 +20,7 @@ Keep boundaries explicit:
 - `AgenticVoiceKit` depends on the bridge only through the documented HTTP contract, never by importing `TTSBridgeCore` (keep Vapor and FluidAudio out of it). The `agentic-voice` command (`AgenticVoiceCLI`) and the app share it.
 - The macOS app is presentation only. It hosts `TTSBridgeCore`, writes the shared settings file, and calls `AgenticVoiceKit` for client installation and voice previews; it never edits client files or calls the TTS backend itself.
 - Client config editing stays in `AgenticVoiceKit/Clients/` (pure text edits in `ConfigEdit.swift`, file handling in `Clients.swift`).
-- `~/Library/Application Support/AgenticVoice/config.json` is the only persisted setting. Cloned voices (`AgenticVoice/Voices/`) are voice data, like installed Kokoro voices, not settings. `Config.swift` defines its format; the app reads and writes only `voice` and `speed`, applying the same rules. The app speaks (voice preview) only through `VoiceService`, never by calling the synthesis endpoint itself; its only direct HTTP request is the health check in the bridge startup protocol.
+- `~/Library/Application Support/AgenticVoice/config.json` is the only persisted setting that speech reads. The app's own display preferences (the speaking overlay's toggles, style and dragged positions) live in its `UserDefaults`, since only the app uses them; the command always announces speech and the app decides whether to show it. Cloned voices (`AgenticVoice/Voices/`) are voice data, like installed Kokoro voices, not settings. `Config.swift` defines its format; the app reads and writes only `voice` and `speed`, applying the same rules. The app speaks (voice preview) only through `VoiceService`, never by calling the synthesis endpoint itself; its only direct HTTP request is the health check in the bridge startup protocol.
 
 Do not let transport-specific objects leak into application code.
 
@@ -33,7 +33,7 @@ Prefer direct code over patterns. A small function or class is better than a fra
 Do not add capabilities without a concrete requirement. In particular, avoid adding:
 
 - provider abstraction layers before a second TTS provider exists;
-- persistence beyond the shared settings file, queues, retries, telemetry, or a web UI (the native app is the only UI); a busy speaker is reported to the caller, never queued;
+- persistence beyond the shared settings file and the app's display preferences, queues, retries, telemetry, or a web UI (the native app is the only UI); a busy speaker is reported to the caller, never queued;
 - an embedded summarization LLM, including inside a hook — hooks (`hooks/`) stay fixed-phrase and deterministic, never transcript-parsing;
 - speech-to-text or full-duplex audio.
 
