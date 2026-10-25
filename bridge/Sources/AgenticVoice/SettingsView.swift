@@ -398,8 +398,8 @@ struct OverlayTab: View {
                 Text("Appearance")
             } footer: {
                 Text(style == .floating
-                    ? "Drag the card anywhere; it opens there next time on that display. Double-click it to put it back in the corner."
-                    : "The notch grows down to show the orb and text, then slides back. Displays without a notch show the floating card.")
+                    ? "The orb floats in a corner and what it says rises above it in bubbles. Drag it anywhere; it appears there next time on that display. Double-click it to put it back in the corner."
+                    : "An island grows down from the top centre of the display to show the orb and text, then slides back. On a display with a notch, it grows out of the notch.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             .disabled(!enabled || !(showOrb || showText))

@@ -156,8 +156,10 @@ While an agent speaks, the app shows a thinking orb (from [thinking-orbs](https:
 
 Two styles:
 
-- **Floating** (default): a card in a corner of the screen, bottom right unless you choose another. Drag it anywhere; it opens there next time on that display. Double-click puts it back in the corner, × hides it until the next message.
-- **Notch**: on a display with a camera housing, the notch grows down to hold the orb and text, then slides back when the voice stops. Click it to hide it. Displays without a notch show the floating card.
+- **Companion** (default): the orb floats on its own in a corner of the screen, bottom right unless you choose another, and what it says rises above it in speech bubbles; an agent's previous two lines stay faded above the current one while it keeps talking. Drag it anywhere; it appears there next time on that display. Double-click puts it back in the corner, × hides it until the next message.
+- **Island**: a cream island grows down from the top centre of the display to hold the orb and text, then slides back when the voice stops, on any display; on one with a camera housing it grows out of the notch. Click it to hide it.
+
+When your accent color is Graphite, the orb is drawn in warm coral instead of grey.
 
 Whichever process speaks (MCP, CLI or hook) posts a distributed notification, `com.maxanatsko.agentic-voice.speech`, when playback starts and when it ends; its object is a JSON `SpeechEvent` (see [`SpeechEvents.swift`](bridge/Sources/AgenticVoiceKit/SpeechEvents.swift)). Nothing is posted while another session holds the speaker. Posting never waits or fails: without the app running, speech is unaffected and nothing is shown.
 
