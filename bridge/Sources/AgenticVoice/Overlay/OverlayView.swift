@@ -88,6 +88,10 @@ struct Companion: View {
             if presentation.showOrb {
                 GlowingOrb(kind: presentation.utterance.kind, size: 48)
                     .frame(width: 64, height: 64)
+                    // Without text there is no bubble to carry the close button.
+                    .overlay(alignment: presentation.trailing ? .topLeading : .topTrailing) {
+                        if !presentation.showText { DismissButton(overlay: overlay) }
+                    }
             }
         }
         .gesture(WindowDragGesture())
@@ -135,20 +139,28 @@ struct Bubble: View {
         .background(Warm.paper(colorScheme), in: shape)
         .shadow(color: .black.opacity(0.14), radius: 10, y: 3)
         .overlay(alignment: trailing ? .topLeading : .topTrailing) {
-            if let overlay {
-                Button { overlay.dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .bold))
-                        .frame(width: 18, height: 18)
-                        .background(Warm.paper(colorScheme), in: Circle())
-                        .shadow(color: .black.opacity(0.12), radius: 3)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Warm.ink(colorScheme).opacity(0.6))
-                .offset(x: trailing ? -6 : 6, y: -6)
-                .help("Hide until the next message")
-            }
+            if let overlay { DismissButton(overlay: overlay).offset(x: trailing ? -6 : 6, y: -6) }
         }
+    }
+}
+
+/// Hides the companion until the next message; the voice carries on.
+struct DismissButton: View {
+    let overlay: SpeechOverlay
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Button { overlay.dismiss() } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 8, weight: .bold))
+                .frame(width: 18, height: 18)
+                .background(Warm.paper(colorScheme), in: Circle())
+                .shadow(color: .black.opacity(0.12), radius: 3)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Warm.ink(colorScheme).opacity(0.6))
+        .help("Hide until the next message")
     }
 }
 

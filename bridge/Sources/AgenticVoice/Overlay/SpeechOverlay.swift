@@ -103,9 +103,10 @@ final class SpeechOverlay: ObservableObject {
                 ?? (OverlaySettings.corner == .topRight || OverlaySettings.corner == .bottomRight)
         }
         // A new layout starts closed so it opens with its own animation; the same layout just updates,
-        // and the companion keeps the last two lines above the new one.
+        // and the companion keeps the last two lines above the new one when the same project speaks,
+        // so one agent's lines never read as another's.
         let continuing = panel?.isVisible == true && expanded && presentation.map { Self.sameLayout($0, next) } == true
-        if continuing, let previous = presentation, style == .floating {
+        if continuing, let previous = presentation, style == .floating, previous.utterance.project == utterance.project {
             next.earlier = Array((previous.earlier + [previous.utterance]).suffix(2))
         }
         if !continuing { expanded = false }
