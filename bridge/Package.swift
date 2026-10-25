@@ -42,10 +42,12 @@ let package = Package(
                 .product(name: "MCP", package: "swift-sdk")
             ]
         ),
+        // Thinking-orbs geometry (MIT, libraries.dev/orbs), from visual-explainer's VECore/OrbEngine.swift.
+        .target(name: "OrbKit"),
         // The menu bar app; scripts/build-app.sh wraps it in "Agentic Voice.app".
         .executableTarget(
             name: "AgenticVoice",
-            dependencies: ["TTSBridgeCore", "AgenticVoiceKit"]
+            dependencies: ["TTSBridgeCore", "AgenticVoiceKit", "OrbKit"]
         ),
         .testTarget(
             name: "AgenticVoiceKitTests",
@@ -54,6 +56,10 @@ let package = Package(
         .testTarget(
             name: "TTSBridgeCoreTests",
             dependencies: ["TTSBridgeCore"]
+        ),
+        .testTarget(
+            name: "OrbKitTests",
+            dependencies: ["OrbKit"]
         )
     ]
 )

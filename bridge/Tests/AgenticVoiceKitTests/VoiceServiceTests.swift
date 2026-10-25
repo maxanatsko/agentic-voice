@@ -1,5 +1,6 @@
 @testable import AgenticVoiceKit
 import Foundation
+import Synchronization
 import Testing
 
 struct VoiceServiceTests {
@@ -39,6 +40,7 @@ struct VoiceServiceTests {
         let player: String
         let lockPort = freePort()
         let synthesized = Counter()
+        let events = RecordedEvents()
 
         init(playerExitStatus: Int = 0) async throws {
             let directory = try TemporaryDirectory()
@@ -60,7 +62,8 @@ struct VoiceServiceTests {
             VoiceService(
                 tts: TTSClient(baseURL: tts.url, voice: "am_michael", language: "en-US", speed: 1),
                 player: AudioPlayer(command: player, lockPort: lockPort),
-                maxChars: maxChars
+                maxChars: maxChars,
+                announce: events.post
             )
         }
 
@@ -84,10 +87,62 @@ struct VoiceServiceTests {
     @Test func synthesizesEveryChunkOfLongText() async throws {
         let fixture = try await Fixture()
         try fixture.finish()
-        let sentence = String(repeating: "word ", count: 40) + "end."
+        // Capitalized: a period before a lowercase word is no sentence break.
+        let sentence = "Start " + String(repeating: "word ", count: 39) + "end."
         let text = Array(repeating: sentence, count: 3).joined(separator: " ")
         #expect(try await fixture.voice(maxChars: 1200).speak(text) == .spoken)
         #expect(fixture.synthesized.value == 3)
+    }
+
+    @Test func announcesPlaybackToTheOverlay() async throws {
+        let fixture = try await Fixture()
+        try fixture.finish()
+        #expect(try await fixture.voice().speak("  Review\ncomplete. ", kind: .completion) == .spoken)
+        guard case let .started(utterance) = fixture.events.all.first else {
+            Issue.record("expected a started event, got \(fixture.events.all)")
+            return
+        }
+        #expect(utterance.text == "Review complete.")
+        #expect(utterance.kind == .completion)
+        #expect(utterance.project == VoiceService.project())
+        #expect(utterance.pid == getpid())
+        #expect(fixture.events.all == [.started(utterance), .ended(id: utterance.id)])
+    }
+
+    @Test func announcesNothingWhenBusy() async throws {
+        let fixture = try await Fixture()
+        let first = Task { try await fixture.voice().speak("First message.") }
+        try await fixture.playing()
+        let second = RecordedEvents()
+        let busy = VoiceService(
+            tts: TTSClient(baseURL: fixture.tts.url, voice: "am_michael", language: "en-US", speed: 1),
+            player: AudioPlayer(command: fixture.player, lockPort: fixture.lockPort),
+            maxChars: 100, announce: second.post)
+        #expect(try await busy.speak("Second message.") == .busy)
+        #expect(second.all.isEmpty)
+        try fixture.finish()
+        _ = try await first.value
+    }
+
+    @Test func endsTheAnnouncementAfterAPlaybackFailure() async throws {
+        let fixture = try await Fixture(playerExitStatus: 1)
+        try fixture.finish()
+        await #expect(throws: AgenticVoiceError.self) { try await fixture.voice().speak("Failing message.") }
+        #expect(fixture.events.all.count == 2)
+        if case .ended = fixture.events.all.last {} else { Issue.record("expected an ended event last, got \(fixture.events.all)") }
+    }
+
+    @Test func speechEventsSurviveTheNotificationEncoding() throws {
+        let event = SpeechEvent.started(Utterance(text: "Done.", project: "agentic-voice"))
+        let json = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
+        let notification = Notification(name: DistributedSpeechEvents.name, object: json)
+        #expect(DistributedSpeechEvents.decode(notification) == event)
+        #expect(DistributedSpeechEvents.decode(Notification(name: DistributedSpeechEvents.name, object: "nope")) == nil)
+    }
+
+    @Test func namesTheProjectAfterTheWorkingDirectory() {
+        #expect(VoiceService.project(directory: "/Users/me/code/agentic-voice") == "agentic-voice")
+        #expect(VoiceService.project(directory: "/") == nil)
     }
 
     @Test func releasesTheSpeakerAfterAPlaybackFailure() async throws {
@@ -113,4 +168,11 @@ struct VoiceServiceTests {
         let client = TTSClient(baseURL: server.url, voice: "am_michael", language: "en-US", speed: 1)
         await #expect(throws: AgenticVoiceError("TTS request failed with HTTP 500: model not loaded")) { try await client.synthesize("Hi.") }
     }
+}
+
+/// Speech events, kept in order.
+final class RecordedEvents: Sendable {
+    private let events = Mutex<[SpeechEvent]>([])
+    var all: [SpeechEvent] { events.withLock { $0 } }
+    func post(_ event: SpeechEvent) { events.withLock { $0.append(event) } }
 }

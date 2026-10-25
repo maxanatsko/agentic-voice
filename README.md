@@ -45,6 +45,7 @@ Responsibilities are intentionally narrow. The command is in `bridge/Sources/Age
 - `AudioPlayer.swift` — local playback and the speaking lock only.
 - `Config.swift` — configuration (environment, `.env`, settings file) only.
 - `Clients/` — writing agentic-voice entries into client config files only.
+- `SpeechEvents.swift` — the speech started/ended notifications the app's speaking overlay listens for only.
 
 ## Requirements
 
@@ -112,6 +113,12 @@ Try the CLI:
 bridge/.build/release/agentic-voice speak "Review complete. Two blocking issues need your attention."
 ```
 
+`--kind <question|completion|alert|custom>` before the text tells the [speaking overlay](#speaking-overlay) which orb to show:
+
+```bash
+bridge/.build/release/agentic-voice speak --kind question "Should I also update the docs?"
+```
+
 Or pipe text from a hook:
 
 ```bash
@@ -132,15 +139,27 @@ Or build it from source on an Apple Silicon Mac running macOS 26+ with Xcode 26+
 scripts/build-app.sh   # → build/Agentic Voice.app (ad-hoc signed, not notarized)
 ```
 
-Move it to `/Applications` and open it. On first run it downloads the model and the default voice, showing progress in the menu. It follows the same rules as MCP's bridge management: if a healthy bridge is already running it uses that one and takes over when it goes away, and it takes the `127.0.0.1:19000` startup lock so only one process loads the model. The menu offers Settings, Welcome, Launch at Login and Quit.
+Move it to `/Applications` and open it. On first run it downloads the model and the default voice, showing progress in the menu. It follows the same rules as MCP's bridge management: if a healthy bridge is already running it uses that one and takes over when it goes away, and it takes the `127.0.0.1:19000` startup lock so only one process loads the model. The menu offers Settings, Welcome, Show Speaking Overlay, Launch at Login and Quit.
 
 Until the shared settings file exists, the app opens a short onboarding window at launch: it shows the engine preparing, then lets you pick or clone a voice, install agentic-voice into your clients and turn on Launch at Login. Done saves your voice to the settings file, so onboarding doesn't open again; Welcome in the menu reopens it. Quitting stops the engine; MCP servers that were using it can't speak until they restart.
 
-Settings has three tabs:
+Settings has four tabs:
 
 - **General**: the default voice and speed, saved to the shared settings file and applied on every agent's next spoken message. Also shows the voice engine's status.
 - **Voices**: clone your own voice, and install, preview or delete any of the 28 English voices. Preview speaks through the same `VoiceService` agents use, so it takes the same speaking lock and never talks over them. To clone, record yourself reading a short script (the app asks for microphone access) or choose an existing recording, then name the voice; it becomes a `clone_<name>` voice you can select like any other. See [voice cloning](bridge/README.md#voice-cloning).
 - **Clients**: install, update or uninstall agentic-voice in each client with the same installer as `agentic-voice clients` (see below), using your login shell's `PATH` so it can find `claude`. Client entries and hooks point at the bundled `agentic-voice` command, so they show as outdated if you move the app (or if they were written by an older, Node-based version); Update fixes them.
+- **Overlay**: show or hide the [speaking overlay](#speaking-overlay)'s orb and text, and choose its style, corner and display.
+
+### Speaking overlay
+
+While an agent speaks, the app shows a thinking orb (from [thinking-orbs](https://libraries.dev/orbs), MIT, ported in visual-explainer) and the spoken text. Turn either off, or the whole overlay, in Settings → Overlay or from the menu. The orb follows the speak tool's `kind`: a flowing band for `completion`, a waveform for `question`, scrambling bands for `alert`, and a calm ring otherwise, including the lifecycle hooks' phrases. The text shows the project the agent runs in and up to five lines of what it says.
+
+Two styles:
+
+- **Floating** (default): a card in a corner of the screen, bottom right unless you choose another. Drag it anywhere; it opens there next time on that display. Double-click puts it back in the corner, × hides it until the next message.
+- **Notch**: on a display with a camera housing, the notch grows down to hold the orb and text, then slides back when the voice stops. Click it to hide it. Displays without a notch show the floating card.
+
+Whichever process speaks (MCP, CLI or hook) posts a distributed notification, `com.maxanatsko.agentic-voice.speech`, when playback starts and when it ends; its object is a JSON `SpeechEvent` (see [`SpeechEvents.swift`](bridge/Sources/AgenticVoiceKit/SpeechEvents.swift)). Nothing is posted while another session holds the speaker. Posting never waits or fails: without the app running, speech is unaffected and nothing is shown.
 
 ## Install into clients
 
@@ -179,7 +198,7 @@ speak({ text, kind? })
 
 If another session is already speaking, `speak` returns `Not spoken: another agentic-voice session is speaking…` (not an error), and the server's instructions tell the agent to usually skip rather than retry.
 
-`kind` is optional metadata: `question`, `completion`, `alert`, or `custom`. It currently does not change synthesis behavior; keeping it in the contract leaves room for small policy changes without creating separate tools.
+`kind` is optional: `question`, `completion`, `alert`, or `custom`. It does not change synthesis; the app's [speaking overlay](#speaking-overlay) picks its orb from it.
 
 The server sends MCP `instructions` telling the agent when to speak: a one- or two-sentence summary when it finishes a turn of work, the question itself when it needs input (in addition to showing it as text), and blockers. Spoken text is written for listening, never code, paths, or logs. See `instructions` in [`MCPServer.swift`](bridge/Sources/AgenticVoiceCLI/MCPServer.swift).
 

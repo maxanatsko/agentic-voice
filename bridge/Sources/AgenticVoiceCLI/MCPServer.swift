@@ -11,8 +11,6 @@ private let instructions = """
     If speak reports that another session is speaking, do not retry right away; usually skip it, since your text reply already carries the message.
     """
 
-private let speakKinds = ["question", "completion", "alert", "custom"]
-
 private let speakTool = Tool(
     name: "speak",
     title: "Speak a short message",
@@ -26,8 +24,8 @@ private let speakTool = Tool(
             ]),
             "kind": .object([
                 "type": .string("string"),
-                "enum": .array(speakKinds.map { .string($0) }),
-                "description": .string("Optional reason for speaking. Metadata only in the MVP."),
+                "enum": .array(SpeechKind.allCases.map { .string($0.rawValue) }),
+                "description": .string("Optional reason for speaking. The Agentic Voice app's speaking overlay picks its animation from it."),
             ]),
         ]),
         "required": .array([.string("text")]),
@@ -71,8 +69,12 @@ func runMCPServer(environment: [String: String], bridgeExecutable: URL) async th
         guard let text = params.arguments?["text"]?.stringValue else {
             return .init(content: [reply("speak needs a \"text\" string.")], isError: true)
         }
-        if let kind = params.arguments?["kind"], !speakKinds.contains(kind.stringValue ?? "") {
-            return .init(content: [reply("speak \"kind\" must be one of: \(speakKinds.joined(separator: ", ")).")], isError: true)
+        var kind: SpeechKind?
+        if let value = params.arguments?["kind"] {
+            guard let parsed = value.stringValue.flatMap({ SpeechKind(rawValue: $0) }) else {
+                return .init(content: [reply("speak \"kind\" must be one of: \(speechKinds).")], isError: true)
+            }
+            kind = parsed
         }
         do {
             try await ready.value
@@ -80,7 +82,7 @@ func runMCPServer(environment: [String: String], bridgeExecutable: URL) async th
             // The endpoint stays fixed: the bridge was resolved and started for it.
             var current = try Config.load(environment: environment)
             current.ttsURL = ttsURL
-            let outcome = try await VoiceService(config: current).speak(text)
+            let outcome = try await VoiceService(config: current).speak(text, kind: kind)
             return .init(content: [reply(outcome == .spoken
                 ? "Spoken successfully."
                 : "Not spoken: another agentic-voice session is speaking. Your text reply is unaffected; skip, or call speak again later only if it still matters.")])

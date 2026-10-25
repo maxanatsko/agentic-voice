@@ -65,6 +65,7 @@ struct OnboardingView: View {
     @State private var cloning = false
     /// Saved only by Done, so closing onboarding early leaves no settings file and it opens again.
     @State private var voice: String?
+    @AppStorage(OverlaySettings.enabledKey) private var overlayEnabled = true
 
     private var chosenVoice: Voice { Voice(id: voice ?? model.selectedVoice) }
 
@@ -110,6 +111,10 @@ struct OnboardingView: View {
                 case .finish:
                     Section { LaunchAtLoginToggle() } footer: {
                         Text("Keeps the voice engine ready, so agents can speak as soon as they start.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    Section { Toggle("Show the speaking overlay", isOn: $overlayEnabled) } footer: {
+                        Text("An animated orb and the spoken text appear while an agent speaks. Choose the style and position in Settings.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }

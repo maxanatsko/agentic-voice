@@ -36,6 +36,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case general = "General"
     case voices = "Voices"
     case clients = "Clients"
+    case overlay = "Overlay"
 
     var id: Self { self }
 
@@ -44,6 +45,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .general: return "gearshape"
         case .voices: return "person.wave.2"
         case .clients: return "apple.terminal"
+        case .overlay: return "sparkles"
         }
     }
 
@@ -52,6 +54,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .general: return .gray
         case .voices: return .purple
         case .clients: return .blue
+        case .overlay: return .orange
         }
     }
 
@@ -60,6 +63,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .general: return "Choose the voice and speed agents speak with, and check the voice engine."
         case .voices: return "Clone your own voice, or install, preview and remove the built-in ones."
         case .clients: return "Connect Agentic Voice to the coding agents on this Mac."
+        case .overlay: return "Show an animated orb and the spoken text on screen while an agent speaks."
         }
     }
 }
@@ -110,6 +114,7 @@ struct SettingsView: View {
                 case .general: GeneralTab(model: model, host: host)
                 case .voices: VoicesTab(model: model, host: host)
                 case .clients: ClientsTab(model: model)
+                case .overlay: OverlayTab(model: model)
                 }
             }
             .formStyle(.grouped)
@@ -350,6 +355,60 @@ struct ClientsTab: View {
         case (true, true): return ("Installed", "checkmark.circle.fill", .green)
         case (true, false): return ("Installed with outdated paths", "exclamationmark.circle.fill", .orange)
         case (false, _): return (client.detected ? "Not installed" : "Not installed (not detected on this Mac)", "circle.dashed", .secondary)
+        }
+    }
+}
+
+struct OverlayTab: View {
+    @ObservedObject var model: SettingsModel
+    @AppStorage(OverlaySettings.enabledKey) private var enabled = true
+    @AppStorage(OverlaySettings.showOrbKey) private var showOrb = true
+    @AppStorage(OverlaySettings.showTextKey) private var showText = true
+    @AppStorage(OverlaySettings.styleKey) private var style = OverlayStyle.floating
+    @AppStorage(OverlaySettings.cornerKey) private var corner = OverlayCorner.bottomRight
+    @AppStorage(OverlaySettings.displayKey) private var display = OverlayDisplay.pointer
+
+    var body: some View {
+        Group {
+            Section {
+                Toggle("Show while agents speak", isOn: $enabled)
+                Toggle("Thinking orb", isOn: $showOrb).disabled(!enabled)
+                Toggle("Spoken text", isOn: $showText).disabled(!enabled)
+            } footer: {
+                Text("The orb follows what the agent is saying: a flowing band for a summary, a waveform for a question, scrambling bands for an alert.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            Section {
+                Picker("Style", selection: $style) {
+                    ForEach(OverlayStyle.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                Picker("Position", selection: $corner) {
+                    ForEach(OverlayCorner.allCases) { Text($0.title).tag($0) }
+                }
+                .disabled(style != .floating)
+                Picker("Show on", selection: $display) {
+                    ForEach(OverlayDisplay.allCases) { Text($0.title).tag($0) }
+                }
+                LabeledContent("Dragged positions") {
+                    Button("Reset") { OverlaySettings.forgetDraggedPositions() }
+                }
+                .disabled(style != .floating)
+            } header: {
+                Text("Appearance")
+            } footer: {
+                Text(style == .floating
+                    ? "Drag the card anywhere; it opens there next time on that display. Double-click it to put it back in the corner."
+                    : "The notch grows down to show the orb and text, then slides back. Displays without a notch show the floating card.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            .disabled(!enabled || !(showOrb || showText))
+            Section {
+                LabeledContent("Try it") {
+                    Button("Preview", systemImage: "play.fill") { Task { await model.play(Voice(id: model.selectedVoice)) } }
+                        .disabled(!model.engineReady || model.previewing || !enabled)
+                }
+            }
         }
     }
 }

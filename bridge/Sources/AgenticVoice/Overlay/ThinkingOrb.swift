@@ -1,0 +1,80 @@
+import AgenticVoiceKit
+import AppKit
+import OrbKit
+import SwiftUI
+
+/// A thinking-orbs (MIT, libraries.dev/orbs) animation, from visual-explainer's ThinkingOrb: the
+/// geometry comes from `OrbEngine`, painted as matte dots in shades of the system accent color
+/// with the library's tint ramp. The 64 pt tuning, drawn at `displaySize` with bolder dots and a
+/// softer depth fade so it reads at that size. Holds still under Reduce Motion, as the original does.
+struct ThinkingOrb: View {
+    var state: OrbState = .breathing
+    var displaySize: CGFloat = 44
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// How far far-side dots fade toward the background (1 = the library's full fade).
+    private static let fade = 0.55
+
+    /// The tuned preset with radii ×1.5 (the library's `dotSize` knob).
+    @MainActor private static var cache: [OrbState: (speed: Double, opts: OrbOpts)] = [:]
+
+    @MainActor private static func tuned(_ state: OrbState) -> (speed: Double, opts: OrbOpts) {
+        if let hit = cache[state] { return hit }
+        var p = OrbEngine.preset(state, .large)
+        p.opts = OrbEngine.scaleRadii(p.opts, 1.5)
+        cache[state] = p
+        return p
+    }
+
+    var body: some View {
+        let p = Self.tuned(state)
+        let (r, g, b) = Self.accentRGB()
+        TimelineView(.animation(paused: reduceMotion)) { ctx in
+            Canvas { gc, _ in
+                // Reduce Motion paints the same fixed instant the library does.
+                let t = reduceMotion ? 0.6 : ctx.date.timeIntervalSinceReferenceDate * p.speed
+                let size = OrbSize.large.rawValue
+                let frame = OrbEngine.frame(state, size: Double(size), t: t, opts: p.opts)
+                let dark = colorScheme == .dark
+                // The library's tint ramp, softened: far ink fades toward black on dark, toward white on light.
+                func ink(_ white: Double, _ a: Double) -> Color {
+                    let w = min(1, max(0, white)) * Self.fade
+                    func ramp(_ c: Double) -> Double { dark ? c * (1 - w) : c + (1 - c) * w }
+                    return Color(red: ramp(r), green: ramp(g), blue: ramp(b), opacity: a)
+                }
+                let scale = displaySize / CGFloat(size)
+                gc.scaleBy(x: scale, y: scale)
+                for l in frame.lines {
+                    gc.stroke(Path { $0.move(to: CGPoint(x: l.x1, y: l.y1)); $0.addLine(to: CGPoint(x: l.x2, y: l.y2)) },
+                              with: .color(ink(l.white, l.a)), lineWidth: l.w)
+                }
+                for d in frame.dots {
+                    gc.fill(Path(ellipseIn: CGRect(x: d.x - d.r, y: d.y - d.r, width: d.r * 2, height: d.r * 2)),
+                            with: .color(ink(d.white, d.a)))
+                }
+            }
+        }
+        .frame(width: displaySize, height: displaySize)
+        .accessibilityHidden(true)
+    }
+
+    private static func accentRGB() -> (Double, Double, Double) {
+        let c = NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? .systemBlue
+        return (Double(c.redComponent), Double(c.greenComponent), Double(c.blueComponent))
+    }
+}
+
+extension OrbState {
+    /// The orb for a speak tool kind: a flowing band for a summary, a waveform when it's your
+    /// turn, scrambling bands for an alert, and a calm ring otherwise.
+    init(kind: SpeechKind?) {
+        switch kind {
+        case .completion: self = .composing
+        case .question: self = .listening
+        case .alert: self = .solving
+        case .custom, nil: self = .breathing
+        }
+    }
+}

@@ -31,9 +31,10 @@ func fail(_ message: String) -> Never {
 
 let usage = """
     usage: agentic-voice mcp
-           agentic-voice speak <text...>      (or text on stdin)
+           agentic-voice speak [--kind <kind>] [--] <text...>   (or text on stdin)
            agentic-voice clients status [client...]
            agentic-voice clients <install|uninstall> <client...>
+    kinds: \(speechKinds)
     clients: \(Clients.ids.joined(separator: ", "))
     """
 
