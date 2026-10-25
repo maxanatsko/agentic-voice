@@ -22,14 +22,14 @@ enum OverlaySettings {
     static var corner: OverlayCorner { defaults.string(forKey: cornerKey).flatMap { OverlayCorner(rawValue: $0) } ?? .bottomRight }
     static var display: OverlayDisplay { defaults.string(forKey: displayKey).flatMap { OverlayDisplay(rawValue: $0) } ?? .pointer }
 
-    /// Where the floating overlay was dragged to on `screen`: its top-left corner, relative to the
-    /// screen's origin so it survives rearranging displays.
-    static func draggedTopLeft(on screen: NSScreen) -> CGPoint? {
+    /// Where the companion was dragged to on `screen`: the bottom corner on its orb's side, relative
+    /// to the screen's origin so it survives rearranging displays.
+    static func draggedAnchor(on screen: NSScreen) -> CGPoint? {
         guard let pair = defaults.array(forKey: positionKey(screen)) as? [Double], pair.count == 2 else { return nil }
         return CGPoint(x: screen.frame.minX + pair[0], y: screen.frame.minY + pair[1])
     }
 
-    static func saveDraggedTopLeft(_ point: CGPoint, on screen: NSScreen) {
+    static func saveDraggedAnchor(_ point: CGPoint, on screen: NSScreen) {
         defaults.set([Double(point.x - screen.frame.minX), Double(point.y - screen.frame.minY)], forKey: positionKey(screen))
     }
 
@@ -51,17 +51,18 @@ enum OverlaySettings {
 }
 
 enum OverlayStyle: String, CaseIterable, Identifiable {
-    /// A card you can drag anywhere.
+    /// The orb floats on its own, in a corner or wherever it was dragged, and what it says rises
+    /// above it in bubbles.
     case floating
-    /// The notch grows down to hold the orb and text, then shrinks back.
+    /// A cream island grows down from the top centre of any display, around the notch if there is one.
     case notch
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .floating: return "Floating"
-        case .notch: return "Notch"
+        case .floating: return "Companion"
+        case .notch: return "Island"
         }
     }
 }
@@ -109,6 +110,11 @@ enum OverlayDisplay: String, CaseIterable, Identifiable {
 
 @MainActor
 extension NSScreen {
+    /// The menu bar's height, which the island hangs through: taller on displays with a notch.
+    var menuBarHeight: CGFloat {
+        max(safeAreaInsets.top, frame.maxY - visibleFrame.maxY, NSStatusBar.system.thickness)
+    }
+
     /// The camera housing, in screen coordinates; nil on displays without one. It is what the
     /// menu bar areas on either side of it leave of the screen's width.
     var notchFrame: CGRect? {
