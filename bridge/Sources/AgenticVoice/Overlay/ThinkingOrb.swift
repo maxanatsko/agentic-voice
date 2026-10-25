@@ -30,14 +30,14 @@ struct ThinkingOrb: View {
 
     var body: some View {
         let p = Self.tuned(state)
-        let (r, g, b) = Self.accentRGB()
+        let dark = colorScheme == .dark
+        let (r, g, b) = Self.inkRGB()
         TimelineView(.animation(paused: reduceMotion)) { ctx in
             Canvas { gc, _ in
                 // Reduce Motion paints the same fixed instant the library does.
                 let t = reduceMotion ? 0.6 : ctx.date.timeIntervalSinceReferenceDate * p.speed
                 let size = OrbSize.large.rawValue
                 let frame = OrbEngine.frame(state, size: Double(size), t: t, opts: p.opts)
-                let dark = colorScheme == .dark
                 // The library's tint ramp, softened: far ink fades toward black on dark, toward white on light.
                 func ink(_ white: Double, _ a: Double) -> Color {
                     let w = min(1, max(0, white)) * Self.fade
@@ -60,8 +60,11 @@ struct ThinkingOrb: View {
         .accessibilityHidden(true)
     }
 
-    private static func accentRGB() -> (Double, Double, Double) {
-        let c = NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? .systemBlue
+    /// The system accent color, or the overlay's warm coral when the accent is a grey (Graphite):
+    /// a mid grey faded toward the paper's own shade barely shows.
+    private static func inkRGB() -> (Double, Double, Double) {
+        var c = NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? .systemBlue
+        if c.saturationComponent < 0.15 { c = NSColor(srgbRed: 0.91, green: 0.38, blue: 0.30, alpha: 1) }
         return (Double(c.redComponent), Double(c.greenComponent), Double(c.blueComponent))
     }
 }
