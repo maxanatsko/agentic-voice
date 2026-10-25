@@ -1,0 +1,39 @@
+{
+  "fill-specializations" : [
+    {
+      "value" : {
+        "solid" : "srgb:0.98824,0.96471,0.92941,1.00000"
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : {
+        "solid" : "srgb:0.12549,0.10588,0.09804,1.00000"
+      }
+    }
+  ],
+  "groups" : [
+    {
+      "name" : "Orb",
+      "layers" : [
+        {
+          "image-name" : "ring.svg",
+          "name" : "ring",
+          "glass" : true
+        }
+      ],
+      "shadow" : {
+        "kind" : "layer-color",
+        "opacity" : 0.5
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.2
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}

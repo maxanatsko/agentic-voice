@@ -25,6 +25,12 @@ cp "$BIN/TTSBridge" "$BRIDGE_DIR/TTSBridge"
 cp "$BIN/agentic-voice" "$BRIDGE_DIR/agentic-voice"
 cp -R hooks opencode "$PLUGIN/"
 
+# The app icon: a Liquid Glass icon from Icon Composer (the overlay's breathing orb). actool
+# compiles it into Assets.car, which macOS renders in its default, dark, clear and tinted looks.
+xcrun actool bridge/AppIcon.icon --compile "$CONTENTS/Resources" --platform macosx \
+  --minimum-deployment-target 26.0 --app-icon AppIcon \
+  --output-partial-info-plist "$ROOT/build/AppIcon-partial.plist" >/dev/null
+
 # SwiftPM resource bundles are looked up next to the executable; frameworks from binary
 # targets are found through rpaths.
 shopt -s nullglob
