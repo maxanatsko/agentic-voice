@@ -1,6 +1,6 @@
 {
   "name": "agentic-voice",
-  "version": "0.2.0",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "main": "opencode/plugin.mjs",

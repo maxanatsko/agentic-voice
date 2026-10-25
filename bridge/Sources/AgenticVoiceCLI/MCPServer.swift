@@ -60,7 +60,7 @@ func runMCPServer(environment: [String: String], bridgeExecutable: URL) async th
     }
 
     let server = Server(
-        name: "agentic-voice", version: "0.2.0", instructions: instructions,
+        name: "agentic-voice", version: "0.8.0", instructions: instructions,
         capabilities: .init(tools: .init(listChanged: false))
     )
     await server.withMethodHandler(ListTools.self) { _ in .init(tools: [speakTool]) }
