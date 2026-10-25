@@ -6,16 +6,21 @@ import SwiftUI
 /// A thinking-orbs (MIT, libraries.dev/orbs) animation, from visual-explainer's ThinkingOrb: the
 /// geometry comes from `OrbEngine`, painted as matte dots in shades of the system accent color
 /// with the library's tint ramp. The 64 pt tuning, drawn at `displaySize` with bolder dots and a
-/// softer depth fade so it reads at that size. Holds still under Reduce Motion, as the original does.
+/// softer depth fade so it reads at that size. A change of state morphs the old particles into the
+/// new shape (`OrbMorph`). Holds still under Reduce Motion, as the original does, and switches without morphing.
 struct ThinkingOrb: View {
     var state: OrbState = .breathing
     var displaySize: CGFloat = 44
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The state being morphed away from, and when the morph began.
+    @State private var morphFrom: OrbState?
+    @State private var morphStart = Date.distantPast
 
     /// How far far-side dots fade toward the background (1 = the library's full fade).
-    private static let fade = 0.55
+    nonisolated private static let fade = 0.55
+    nonisolated private static let morphDuration = 1.1
 
     /// The tuned preset with radii ×1.5 (the library's `dotSize` knob).
     @MainActor private static var cache: [OrbState: (speed: Double, opts: OrbOpts)] = [:]
@@ -30,14 +35,22 @@ struct ThinkingOrb: View {
 
     var body: some View {
         let p = Self.tuned(state)
+        let from = morphFrom.map { ($0, Self.tuned($0)) }
+        let start = morphStart
         let dark = colorScheme == .dark
         let (r, g, b) = Self.inkRGB()
         TimelineView(.animation(paused: reduceMotion)) { ctx in
             Canvas { gc, _ in
                 // Reduce Motion paints the same fixed instant the library does.
-                let t = reduceMotion ? 0.6 : ctx.date.timeIntervalSinceReferenceDate * p.speed
+                let now = ctx.date.timeIntervalSinceReferenceDate
                 let size = OrbSize.large.rawValue
-                let frame = OrbEngine.frame(state, size: Double(size), t: t, opts: p.opts)
+                var frame = OrbEngine.frame(state, size: Double(size), t: reduceMotion ? 0.6 : now * p.speed, opts: p.opts)
+                // Each state keeps its own speed while the two blend.
+                let progress = ctx.date.timeIntervalSince(start) / Self.morphDuration
+                if let (old, op) = from, !reduceMotion, progress < 1 {
+                    let previous = OrbEngine.frame(old, size: Double(size), t: now * op.speed, opts: op.opts)
+                    frame = OrbMorph.blend(previous, frame, progress: progress, size: Double(size))
+                }
                 // The library's tint ramp, softened: far ink fades toward black on dark, toward white on light.
                 func ink(_ white: Double, _ a: Double) -> Color {
                     let w = min(1, max(0, white)) * Self.fade
@@ -57,6 +70,10 @@ struct ThinkingOrb: View {
             }
         }
         .frame(width: displaySize, height: displaySize)
+        .onChange(of: state) { old, _ in
+            morphFrom = old
+            morphStart = .now
+        }
         .accessibilityHidden(true)
     }
 
