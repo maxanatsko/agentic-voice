@@ -62,7 +62,7 @@ One download of about 2.5 GB covers all five. Download it from the Agentic Voice
 bridge/.build/release/TTSBridge download-voxtral
 ```
 
-It goes to speech-swift's cache, `~/Library/Caches/qwen3-speech/models/aufklarer/Voxtral-4B-TTS-2603-MLX-4bit/`, so a model downloaded by speech-swift's own tools is reused. A speak request never downloads it: a Voxtral voice that isn't downloaded gets HTTP 400. The model loads on the first Voxtral request (a few seconds) and then stays loaded, holding about 2.6 GB of memory, so a bridge that never speaks one never loads it. Voxtral has no speed control: these voices ignore `speed`.
+It goes to speech-swift's cache, `~/Library/Caches/qwen3-speech/models/aufklarer/Voxtral-4B-TTS-2603-MLX-4bit/`, so a model downloaded by speech-swift's own tools is reused. A speak request never downloads it: a Voxtral voice that isn't downloaded gets HTTP 400. The model loads on the first Voxtral request (a few seconds) and then stays loaded, holding about 2.6 GB of memory, so a bridge that never speaks one never loads it. Voxtral has no speed control: these voices ignore `speed`. They play at the model's own level, about 13 dB quieter than Kokoro; raising it to full scale makes the model's faint background hiss audible.
 
 Voxtral is slower than Kokoro. On an M5 Pro, warm, a 3 s line takes about 1.1 s to synthesize and a 10 s one about 3.3 s (Kokoro: 0.2 s and 0.5 s). The client plays each chunk while synthesizing the next, so that wait is paid once, before the first chunk.
 

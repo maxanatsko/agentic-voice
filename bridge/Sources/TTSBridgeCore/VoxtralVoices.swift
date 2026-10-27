@@ -57,8 +57,9 @@ public enum VoxtralVoices {
         func synthesize(text: String, preset: String) async throws -> Data {
             let model = try loadedModel()
             let samples = try await model.generate(text: text, voice: preset)
-            // Voxtral peaks around a quarter of full scale, far quieter than Kokoro; level it up.
-            return try AudioWAV.data(from: samples, sampleRate: Double(model.sampleRate), normalize: true)
+            // At its own level, about 13 dB below Kokoro: peak-normalizing makes the model's noise
+            // floor audible as hiss.
+            return try AudioWAV.data(from: samples, sampleRate: Double(model.sampleRate), normalize: false)
         }
 
         private func loadedModel() throws -> VoxtralTTSModel {
