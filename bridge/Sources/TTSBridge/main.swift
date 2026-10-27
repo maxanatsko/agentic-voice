@@ -37,6 +37,22 @@ if arguments.first == "clone-voice" {
     }
 }
 
+if arguments.first == "download-voxtral" {
+    guard arguments.count == 1 else {
+        logLine("usage: TTSBridge download-voxtral (about 2.5 GB, personal use only: CC BY-NC 4.0)")
+        exit(64)
+    }
+    do {
+        logLine("downloading Voxtral TTS (about 2.5 GB)...")
+        try await VoxtralVoices.download { logLine(String(format: "%.0f%%", $0 * 100)) }
+        print("downloaded: \(try VoxtralVoices.directory.path)")
+        exit(0)
+    } catch {
+        logLine(error.localizedDescription)
+        exit(1)
+    }
+}
+
 logLine("loading Kokoro-ANE model (first run downloads it, may take a while)...")
 let manager = try await BridgeServer.prepare()
 logLine("model ready")

@@ -10,9 +10,28 @@ public enum BridgeProgress: Sendable {
 
 /// The HTTP contract `AgenticVoiceKit.TTSClient` speaks:
 /// `GET /v1/audio/health` and `POST /v1/audio/synthesize` (multipart `text`/`voice`/`language`/`speed`) → WAV.
-/// Kokoro speaks the catalog voices; PocketTTS speaks cloned (`clone_`) voices.
+/// Kokoro speaks the catalog voices, PocketTTS cloned (`clone_`) voices and Voxtral `voxtral_` voices.
 public enum BridgeServer {
     public static let port = 9000
+
+    /// Which model speaks a voice, chosen by its id.
+    enum Engine: Equatable {
+        case kokoro
+        case cloned
+        case voxtral(preset: String)
+    }
+
+    static func engine(for voice: String) throws -> Engine {
+        if ClonedVoiceStore.isValid(voice) { return .cloned }
+        if VoxtralVoices.isValid(voice) {
+            guard let preset = VoxtralVoices.preset(for: voice) else {
+                let known = VoxtralVoices.voices.map(\.id).joined(separator: ", ")
+                throw Abort(.badRequest, reason: "\(voice) is not a Voxtral voice; use one of \(known)")
+            }
+            return .voxtral(preset: preset)
+        }
+        return .kokoro
+    }
 
     /// Downloads whatever is missing and loads the model. Synthesis is available once this returns.
     /// Always prepares `VoiceCatalog.defaultVoice`, the voice a request without one gets.
@@ -41,6 +60,7 @@ public enum BridgeServer {
         app.http.server.configuration.hostname = "127.0.0.1"
         app.http.server.configuration.port = port
         let clonedVoices = ClonedVoiceStore.Speaker()
+        let voxtralVoices = VoxtralVoices.Speaker()
 
         // HTTP starts only after model initialization, so this endpoint is ready immediately.
         app.get("v1", "audio", "health") { _ async -> HealthResponse in
@@ -56,12 +76,22 @@ public enum BridgeServer {
 
             let requestedVoice = payload.voice?.trimmingCharacters(in: .whitespacesAndNewlines)
             let voice = requestedVoice?.isEmpty == false ? requestedVoice! : VoiceCatalog.defaultVoice
-            if ClonedVoiceStore.isValid(voice) {
+            switch try engine(for: voice) {
+            case .cloned:
                 guard ClonedVoiceStore.isInstalled(voice) else {
                     throw Abort(.badRequest, reason: "cloned voice \(voice) doesn't exist; clone it again in Agentic Voice or run TTSBridge clone-voice")
                 }
                 // PocketTTS has no speed control; cloned voices speak at their natural pace.
                 return wav(try await clonedVoices.synthesize(text: text, voice: voice))
+            case .voxtral(let preset):
+                // Never downloads here: a speak request must not start a 2.5 GB download.
+                guard VoxtralVoices.isDownloaded() else {
+                    throw Abort(.badRequest, reason: "Voxtral voices aren't downloaded; download them in Agentic Voice or run TTSBridge download-voxtral")
+                }
+                // Voxtral has no speed control either.
+                return wav(try await voxtralVoices.synthesize(text: text, preset: preset))
+            case .kokoro:
+                break
             }
             guard VoiceStore.isInstalled(voice) else {
                 throw Abort(.badRequest, reason: "voice \(voice) is not installed; install it in Agentic Voice or run TTSBridge install-voice \(voice)")
@@ -82,7 +112,7 @@ public enum BridgeServer {
         }
 
         app.get { _ async -> String in
-            "TTSBridge (FluidAudio Kokoro-ANE, PocketTTS for cloned voices) is running.\n"
+            "TTSBridge (FluidAudio Kokoro-ANE, PocketTTS for cloned voices, Voxtral TTS) is running.\n"
         }
 
         return app

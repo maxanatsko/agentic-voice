@@ -1,4 +1,5 @@
-/// A Kokoro-82M voice whose accent matches the English text frontend, or a cloned voice.
+/// A Kokoro-82M voice whose accent matches the English text frontend, a cloned voice, or a
+/// Voxtral preset.
 public struct Voice: Identifiable, Hashable, Sendable {
     public let id: String
 
@@ -7,9 +8,14 @@ public struct Voice: Identifiable, Hashable, Sendable {
     }
 
     public var isCloned: Bool { ClonedVoiceStore.isValid(id) }
+    public var isVoxtral: Bool { VoxtralVoices.isValid(id) }
 
-    /// "Michael", from the id's suffix.
+    /// "Michael", from the id's suffix; "Neutral male" for a Voxtral preset.
     public var name: String {
+        if isVoxtral {
+            let preset = id.dropFirst(VoxtralVoices.prefix.count).replacingOccurrences(of: "_", with: " ")
+            return preset.prefix(1).uppercased() + preset.dropFirst()
+        }
         let suffix = id.split(separator: "_").last.map(String.init) ?? id
         return suffix.prefix(1).uppercased() + suffix.dropFirst()
     }
@@ -17,6 +23,7 @@ public struct Voice: Identifiable, Hashable, Sendable {
     /// "US male", from the id's two-letter prefix.
     public var accent: String {
         if isCloned { return "Your voice" }
+        if isVoxtral { return "Voxtral" }
         let accent = id.hasPrefix("a") ? "US" : "UK"
         return id.dropFirst().hasPrefix("f") ? "\(accent) female" : "\(accent) male"
     }

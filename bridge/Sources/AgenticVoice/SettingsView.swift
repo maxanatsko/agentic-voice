@@ -171,7 +171,7 @@ struct GeneralTab: View {
             } header: {
                 Text("Speech")
             } footer: {
-                Text("Applies to every agent on its next spoken message. Cloned voices speak at their natural pace; speed applies to built-in voices. TTS_VOICE or VOICE_SPEED in .env or the environment override these.")
+                Text("Applies to every agent on its next spoken message. Cloned and Voxtral voices speak at their natural pace; speed applies to Kokoro voices. TTS_VOICE or VOICE_SPEED in .env or the environment override these.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             Section("Voice Engine") {
@@ -246,6 +246,21 @@ struct VoicesTab: View {
                 Text("Cloned voices speak with PocketTTS by Kyutai, on this Mac.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
+            Section {
+                ForEach(VoxtralVoices.voices) { voice in row(voice) }
+                if let progress = model.voxtralProgress {
+                    ProgressView(value: progress) { Text("Downloading Voxtral…") }
+                } else if !VoxtralVoices.voices.allSatisfy(model.isInstalled) {
+                    Button("Download Voxtral Voices (2.5 GB)", systemImage: "arrow.down.circle") {
+                        Task { await model.downloadVoxtral() }
+                    }
+                }
+            } header: {
+                Text("Voxtral — Personal Use Only")
+            } footer: {
+                Text("Voxtral 4B TTS by Mistral AI, on this Mac. The weights are CC BY-NC 4.0: personal, non-commercial use only. One download covers all five voices; once one speaks, the model holds about 3 GB of memory until the engine restarts. Speed doesn't apply to them.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
             ForEach(accents, id: \.name) { accent in
                 Section {
                     ForEach(accent.voices) { voice in row(voice) }
@@ -272,6 +287,16 @@ struct VoicesTab: View {
         LabeledContent {
             if model.busyVoices.contains(voice.id) {
                 ProgressView().controlSize(.small)
+            } else if voice.isVoxtral {
+                // The section downloads the whole family; there is no per-voice install or delete.
+                if model.isInstalled(voice) {
+                    Button("Preview", systemImage: "play.fill") { Task { await model.play(voice) } }
+                        .disabled(!model.engineReady || model.previewing)
+                        .labelStyle(.iconOnly)
+                        .buttonBorderShape(.circle)
+                } else {
+                    Text("Not downloaded").foregroundStyle(.secondary)
+                }
             } else if model.isInstalled(voice) {
                 HStack(spacing: 6) {
                     Button("Preview", systemImage: "play.fill") { Task { await model.play(voice) } }
