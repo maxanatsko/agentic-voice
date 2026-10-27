@@ -16,6 +16,7 @@ swift build -c release --package-path bridge --product TTSBridge
 swift build -c release --package-path bridge --product agentic-voice
 swift build -c release --package-path bridge --product AgenticVoice
 BIN="$(swift build -c release --package-path bridge --show-bin-path)"
+scripts/build-mlx-metallib.sh
 
 rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Frameworks" "$BRIDGE_DIR"
@@ -23,6 +24,8 @@ cp bridge/AgenticVoice-Info.plist "$CONTENTS/Info.plist"
 cp "$BIN/AgenticVoice" "$CONTENTS/MacOS/AgenticVoice"
 cp "$BIN/TTSBridge" "$BRIDGE_DIR/TTSBridge"
 cp "$BIN/agentic-voice" "$BRIDGE_DIR/agentic-voice"
+# MLX (the Voxtral voices) loads mlx.metallib from beside the binary that links it.
+cp "$BIN/mlx.metallib" "$BRIDGE_DIR/mlx.metallib"
 cp -R hooks opencode "$PLUGIN/"
 
 # The app icon: a Liquid Glass icon from Icon Composer (the overlay's breathing orb). actool
@@ -38,6 +41,9 @@ for bundle in "$BIN"/*.bundle; do
   cp -R "$bundle" "$BRIDGE_DIR/"
   cp -R "$bundle" "$CONTENTS/Resources/"
 done
+# In the app, MLX runs inside AgenticVoice and finds its shaders as default.metallib in the Cmlx
+# bundle; SwiftPM's own copy there is partial, so replace it with the full library.
+cp "$BIN/mlx.metallib" "$CONTENTS/Resources/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
 for framework in "$BIN"/*.framework; do
   cp -R "$framework" "$BRIDGE_DIR/"
   cp -R "$framework" "$CONTENTS/Frameworks/"

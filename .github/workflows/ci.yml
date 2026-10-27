@@ -27,5 +27,9 @@ jobs:
       - name: Test
         run: swift test --no-parallel --package-path bridge
 
+      # MLX's shaders (the Voxtral voices) need Xcode's Metal toolchain, a separate download.
+      - name: Install Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
+
       - name: Build app
         run: scripts/build-app.sh

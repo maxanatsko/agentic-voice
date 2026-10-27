@@ -10,6 +10,8 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var clonedVoices: [Voice] = []
     @Published private(set) var cloning = false
     @Published private(set) var busyVoices: Set<String> = []
+    /// The Voxtral model download's progress while it runs.
+    @Published private(set) var voxtralProgress: Double?
     @Published private(set) var previewing = false
     @Published private(set) var clients: [ClientStatus] = []
     @Published private(set) var busyClients = false
@@ -29,7 +31,7 @@ final class SettingsModel: ObservableObject {
 
     /// Cloned and installed voices, plus `id` even when it's missing.
     func voiceChoices(including id: String) -> [Voice] {
-        let choices = clonedVoices + VoiceCatalog.voices.filter { installedVoices.contains($0.id) }
+        let choices = clonedVoices + (VoxtralVoices.voices + VoiceCatalog.voices).filter { installedVoices.contains($0.id) }
         return choices.contains { $0.id == id } ? choices : choices + [Voice(id: id)]
     }
 
@@ -106,6 +108,7 @@ final class SettingsModel: ObservableObject {
 
     func refreshVoices() {
         installedVoices = Set(VoiceCatalog.voices.map(\.id).filter(VoiceStore.isInstalled))
+        if VoxtralVoices.isDownloaded() { installedVoices.formUnion(VoxtralVoices.voices.map(\.id)) }
         clonedVoices = ClonedVoiceStore.installed().map(Voice.init(id:))
     }
 
@@ -116,6 +119,25 @@ final class SettingsModel: ObservableObject {
             try await VoiceStore.install(voice.id)
         } catch {
             message = "Couldn't install \(voice.name): \(error.localizedDescription)"
+        }
+        refreshVoices()
+    }
+
+    /// One download installs every Voxtral voice.
+    func downloadVoxtral() async {
+        let ids = Set(VoxtralVoices.voices.map(\.id))
+        busyVoices.formUnion(ids)
+        voxtralProgress = 0
+        defer {
+            busyVoices.subtract(ids)
+            voxtralProgress = nil
+        }
+        do {
+            try await VoxtralVoices.download { fraction in
+                Task { @MainActor in self.voxtralProgress = fraction }
+            }
+        } catch {
+            message = "Couldn't download the Voxtral voices: \(error.localizedDescription)"
         }
         refreshVoices()
     }

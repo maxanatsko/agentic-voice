@@ -14,7 +14,9 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.110.0"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.4.0"),
-        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.1")
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.1"),
+        // Voxtral 4B TTS on MLX. Pinned: speech-swift has no releases to follow.
+        .package(url: "https://github.com/soniqo/speech-swift", revision: "cbad3be29480825707890490f446b19d7288be2d")
     ],
     targets: [
         // Synthesis server, model preparation, voice installation and cloning, shared by the
@@ -23,7 +25,9 @@ let package = Package(
             name: "TTSBridgeCore",
             dependencies: [
                 .product(name: "Vapor", package: "vapor"),
-                .product(name: "FluidAudio", package: "FluidAudio")
+                .product(name: "FluidAudio", package: "FluidAudio"),
+                .product(name: "VoxtralTTS", package: "speech-swift"),
+                .product(name: "AudioCommon", package: "speech-swift")
             ]
         ),
         .executableTarget(
